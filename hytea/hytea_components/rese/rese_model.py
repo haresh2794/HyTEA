@@ -1,6 +1,8 @@
 import pandas as pd
 import yaml
 import numpy as np
+from importlib import resources #allows to access files that are included inside a package.
+
 class RenewableElectricity:
 
     """RES-E component for HyTEA library: calculates hourly output, cumulative energy, average capacity factor, capex, and opex."""
@@ -13,16 +15,24 @@ class RenewableElectricity:
         self.hourly_cf_file = None
 
 
-    def configure(self, config_file):
+    def configure(self, config_file, csv_file=None):
 
         """Load configuration from YAML file or use defaults or use overides from user"""
 
         with open(config_file, 'r') as f:
             cfg = yaml.safe_load(f)
         self.capacity_mw = cfg['capacity_mw']
-        self.hourly_cf_file = cfg['hourly_cf_file']
+        
         self.capex_per_mw = cfg.get('capex_per_mw', 2500)
         self.opex_per_mw = cfg.get('opex_per_mw', 0.03*2500)
+        if csv_file is not None:
+            # Use user-provided CSV
+            self.hourly_cf_file = csv_file
+        else:
+            # Use default CSV from package
+            with resources.path('hytea.data', 'sample_wind_cf.csv') as p:
+                self.hourly_cf_file = str(p)
+        
 
 
     def calculate_hourly_output(self):
