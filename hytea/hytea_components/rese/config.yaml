@@ -1,4 +1,3 @@
 capacity_mw: 50
-hourly_cf_file: ../../data/sample_wind_cf.csv # the file should have a column cf
 capex_per_mw: 2500
 opex_per_mw: 75
