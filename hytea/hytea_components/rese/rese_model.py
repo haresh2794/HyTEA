@@ -18,7 +18,7 @@ class RenewableElectricity:
     def configure(self, config=None, config_file=None, csv_file=None):
 
         """Load configuration from YAML file or use defaults or use overides from user"""
-        
+
         if config is not None:
             cfg = config
         elif config_file is not None:
@@ -33,9 +33,9 @@ class RenewableElectricity:
             }
             
 
-        self.capacity_mw = cfg.get('capacity_mw',100)
-        self.capex_per_mw = cfg.get('capex_per_mw', 2500)
-        self.opex_per_mw = cfg.get('opex_per_mw', 0.03*2500)
+        self.capacity_mw = cfg.get('capacity_mw')
+        self.capex_per_mw = cfg.get('capex_per_mw')
+        self.opex_per_mw = cfg.get('opex_per_mw')
 
         if csv_file is not None:
             self.hourly_cf_file = csv_file
