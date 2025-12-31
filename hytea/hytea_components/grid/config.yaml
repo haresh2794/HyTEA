@@ -1,1 +1,5 @@
-sscd
+ratios: [1]   
+avg_grid_price: 100    
+difference: 50
+ghg_avg: 300
+peak_hours: (17, 18)
