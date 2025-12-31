@@ -1,5 +1,6 @@
 import numpy as np
 import pandas as pd
+import yaml
 from importlib import resources  # allows access to files included in the package
 
 #All files developed and tested on COLAB and pasted
@@ -69,7 +70,7 @@ class Grid:
             Weighted CF = (CF1 + r1*CF2 + r2*CF3 ... ) / (1 + r1 + r2 ...)
         """
         # Convert CFs to numpy arrays
-        hourly_cfs = [np.array(cf) for cf in hourly_cf_mul]
+        hourly_cfs = [np.array(cf) for cf in self.hourly_cf_mul]
 
         # Ensure CF1 exists
         cf1 = hourly_cfs[0]
