@@ -26,6 +26,40 @@ class ALKElectrolyser:
             20: 1.020301014,
             100: 1.041557285
         }
+        # Totals
+        self.total_energy_electrolysis_kWh = None
+        self.total_h2_kg = None
+        self.total_energy_curtailed_kWh = None
+        self.total_compression_energy_kWh = None
+        self.total_transport_energy_kWh = None
+        self.total_water_m3 = None
+        self.capacity_factor = None
+
+        # Stream-level
+        self.streams_power_used_kW = {}
+        self.streams_power_used_MW = {}
+        self.streams_power_curtailed_kW = {}
+        self.streams_power_curtailed_MW = {}
+        self.streams_energy_used_kWh = {}
+        self.streams_energy_used_MWh = {}
+        self.streams_H2_kg ={}
+        self.streams_totals_energy_used_kWh = {}
+        self.streams_totals_energy_curtailed_kWh = {}
+        self.streams_totals_H2_kg = {}
+
+        #hourly
+        self.hourly_total_power_kW = None
+        self.hourly_power_used_kW = None
+        self.hourly_power_curtailed_kW = None
+        self.hourly_energy_used_kWh = None
+        self.hourly_H2_kg = None
+        self.hourly_compression_energy_kWh = None
+        self.hourly_transport_energy_kWh = None
+        self.hourly_water_m3 = None
+        self.hourly_efficiency = None
+        self.hourly_sec_electrolyser = None
+        self.hourly_load = None
+       
 
     # ---------- Default calculation methods ----------
 
@@ -87,7 +121,7 @@ class ALKElectrolyser:
         # ---- Stage 2: compute dependent defaults ----
 
         self.avg_sec_electrolyser = cfg.get(
-            'sec_electrolyser',
+            'avg_sec_electrolyser',
             self._default_avg_sec_electrolyser(self.electro_capacity)
         )
 
@@ -169,7 +203,7 @@ class ALKElectrolyser:
 
 
 
-    def evaluate_multiple_streams(self, power_df):
+    def evaluate(self, power_df):
         """
         Parameters
         ----------
@@ -184,6 +218,7 @@ class ALKElectrolyser:
 
         hours = len(power_df)
 
+       
         # ======================
         # Power domain (kW)
         # ======================
@@ -193,6 +228,7 @@ class ALKElectrolyser:
         power_used_kW = np.minimum(total_power_kW, actual_capacity)
         power_curtailed_kW = total_power_kW - power_used_kW
 
+       
         # ======================
         # Energy domain (kWh) – Δt = 1 h
         # ======================
@@ -207,6 +243,8 @@ class ALKElectrolyser:
         # ======================
         h2_hourly_kg = self.h2_from_energy_kWh(energy_used_kWh,sec_electrolyser)
 
+        
+      
         # ======================
         # Downstream processes (hourly)
         # ======================
@@ -214,28 +252,33 @@ class ALKElectrolyser:
         transport_energy_kWh = h2_hourly_kg * self.sec_transport
         water_m3 = h2_hourly_kg * self.water_consumption
 
+
+
         # ======================
-        # Stream-level allocation (hourly)
+        # Stream-level allocation (hourly) - priority-based
         # ======================
         stream_results = {}
+
+        # Remaining electrolyser power to allocate (hourly)
+        remaining_power_kW = power_used_kW.copy()
 
         for col in power_df.columns:
             stream_power_kW = power_df[col].values
 
-            share = np.divide(
-                stream_power_kW,
-                total_power_kW,
-                out=np.zeros_like(stream_power_kW),
-                where=total_power_kW > 0
-            )
+            # Allocate as much as possible from this stream
+            stream_power_used_kW = np.minimum(stream_power_kW, remaining_power_kW)
 
-            stream_power_used_kW = share * power_used_kW
+            # Power curtailed from this stream is what couldn't be used
             stream_power_curtailed_kW = stream_power_kW - stream_power_used_kW
 
+            # Update remaining electrolyser power for the next stream
+            remaining_power_kW -= stream_power_used_kW
+
+            # Energy used and H2 produced from this stream
             stream_energy_used_kWh = stream_power_used_kW.copy()
+            stream_h2_kg = self.h2_from_energy_kWh(stream_energy_used_kWh, sec_electrolyser)
 
-            stream_h2_kg = share * h2_hourly_kg
-
+            # Store results in dictionary exactly like before
             stream_results[col] = {
                 "power_used_kW": stream_power_used_kW,
                 "power_curtailed_kW": stream_power_curtailed_kW,
@@ -247,6 +290,20 @@ class ALKElectrolyser:
                     "H2_kg": stream_h2_kg.sum()
                 }
             }
+
+            # Also store as class attributes if you want object-style access
+            self.streams_power_used_kW[col] = stream_power_used_kW
+            self.streams_power_used_MW[col] = stream_power_used_kW / 1000
+            self.streams_power_curtailed_kW[col] = stream_power_curtailed_kW
+            self.streams_power_curtailed_MW[col] = stream_power_curtailed_kW / 1000
+            self.streams_energy_used_kWh[col] = stream_energy_used_kWh
+            self.streams_energy_used_MWh[col] = stream_energy_used_kWh / 1000
+            self.streams_H2_kg[col] = stream_h2_kg
+            self.streams_totals_energy_used_kWh[col] = stream_energy_used_kWh.sum()
+            self.streams_totals_energy_curtailed_kWh[col] = stream_power_curtailed_kW.sum()
+            self.streams_totals_H2_kg[col] = stream_h2_kg.sum()
+
+        
 
         # ======================
         # Totals
@@ -261,12 +318,22 @@ class ALKElectrolyser:
             "water_m3": water_m3.sum(),
             "capacity_factor": energy_used_kWh.sum() / (actual_capacity * hours)
         }
+    
+        # ======================
+        # Store totals as object attributes
+        # ======================
+        self.total_energy_electrolysis_kWh = energy_used_kWh.sum()
+        self.total_h2_kg = h2_hourly_kg.sum()
+        self.total_energy_curtailed_kWh = power_curtailed_kW.sum()
+        self.total_compression_energy_kWh = compression_energy_kWh.sum()
+        self.total_transport_energy_kWh = transport_energy_kWh.sum()
+        self.total_water_m3 = water_m3.sum()
+        self.capacity_factor = energy_used_kWh.sum() / (actual_capacity * hours)
 
         # ======================
-        # Output
+        # hourly
         # ======================
-        return {
-            "hourly": {
+        hourly = {
                 "total_power_kW": total_power_kW,
                 "power_used_kW": power_used_kW,
                 "power_curtailed_kW": power_curtailed_kW,
@@ -278,10 +345,31 @@ class ALKElectrolyser:
                 "efficiency": efficiency,
                 "sec_electrolyser": sec_electrolyser,
                 "load": load
-            },
+            }
+        # ======================
+        # Store hourly as object attributes
+        # ======================   
+        self.hourly_total_power_kW = total_power_kW
+        self.hourly_power_used_kW = power_used_kW
+        self.hourly_power_curtailed_kW = power_curtailed_kW
+        self.hourly_energy_used_kWh = energy_used_kWh
+        self.hourly_H2_kg = h2_hourly_kg
+        self.hourly_compression_energy_kWh = compression_energy_kWh
+        self.hourly_transport_energy_kWh = transport_energy_kWh
+        self.hourly_water_m3 = water_m3
+        self.hourly_efficiency = efficiency
+        self.hourly_sec_electrolyser = sec_electrolyser
+        self.hourly_load = load
+        # ======================
+        # Output
+        # ======================
+        return {
+            "hourly": hourly,
             "streams": stream_results,
             "totals": totals
         }
+
+
 
 
 
