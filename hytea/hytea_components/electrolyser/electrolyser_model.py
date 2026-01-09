@@ -154,7 +154,31 @@ class ALKElectrolyser:
             self._default_LHV()
         )
 
+    def show_defaults(self):
+        """
+        Show all configurable parameters with their default values and units.
+        Returns a dictionary that can be directly used in `configure()`.
+        """
+        defaults_with_units = {
+            'electro_capacity': (self._default_electro_capacity(), 'MW'),
+            'avg_sec_electrolyser': (self._default_avg_sec_electrolyser(self._default_electro_capacity()), 'kWh/kg H2'),
+            'sec_compression': (self._default_sec_compression(), 'kWh/kg H2'),
+            'sec_transport': (self._default_sec_transport(), 'kWh/kg H2'),
+            'water_consumption': (self._default_water_consumption(), 'm3/kg H2'),
+            'annual_improvement': (self._default_annual_improvement(), 'fraction'),
+            'install_year': (self._default_install_year(), ''),
+            'LHV': (self._default_LHV(), 'kWh/kg')
+        }
+        print("===== ALK Electrolyser Configurable Defaults =====")
+        for key, (value, unit) in defaults_with_units.items():
+            unit_str = f" ({unit})" if unit else ""
+            print(f"{key}{unit_str}: {value}")
 
+        print("\nYou can override these in object_name.configure(config=...) using a dictionary, e.g.:")
+        print("config = { 'electro_capacity': 10, 'sec_compression': 0.9, ... }")
+
+        # Return dictionary without units for direct use
+        return {key: value for key, (value, _) in defaults_with_units.items()}
 
     def h2_from_energy_kWh(self, energy_kWh,sec_electrolyser):
         total_sec = sec_electrolyser + self.sec_compression
