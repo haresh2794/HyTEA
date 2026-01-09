@@ -13,7 +13,7 @@ class ALKElectrolyser:
 
     def __init__(self):
         self.electro_capacity = None
-        self.sec_electrolyser = None
+        self.avg_sec_electrolyser = None
         self.sec_compression = None
         self.sec_transport = None
         self.water_consumption = None
@@ -32,10 +32,6 @@ class ALKElectrolyser:
     def _default_electro_capacity(self):
         return 4  # MW
 
-    def _default_sec_electrolyser(self):
-        # default electrolyser specific energy consumption
-
-        return 52
 
     def _default_avg_sec_electrolyser(self, capacity):
         """
@@ -89,10 +85,6 @@ class ALKElectrolyser:
         )
 
         # ---- Stage 2: compute dependent defaults ----
-        self.sec_electrolyser = cfg.get(
-            'sec_electrolyser',
-            self._default_sec_electrolyser()
-        )
 
         self.avg_sec_electrolyser = cfg.get(
             'sec_electrolyser',
@@ -173,20 +165,6 @@ class ALKElectrolyser:
 
         return eff / 100  # convert % to fraction
 
-
-
-
-
-    def average_sec(self, size_mw):
-        """
-        Average electrolyser specific energy consumption (SEC)
-        y = c * x^b
-        """
-
-        c = 0.018577706
-        b = 0.028315417
-
-        return c * (size_mw ** b)
 
 
 
