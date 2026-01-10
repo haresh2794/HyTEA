@@ -4,45 +4,54 @@ import numpy as np
 from importlib import resources #allows to access files that are included inside a package.
 
 class RenewableElectricity:
-
-    """RES-E component for HyTEA library: calculates hourly output, cumulative energy, average capacity factor, capex, and opex."""
+    """RES-E component for HyTEA library:
+    calculates hourly output, cumulative energy, average capacity factor, CAPEX, and OPEX.
+    """
 
     def __init__(self):
-        self.hourly_cf = None
-        self.capacity_mw = None
-        self.capex_per_mw = None
-        self.opex_per_mw = None
-        self.hourly_cf_file = None
+        # Core attributes
+        self.capacity_mw = 100          # Installed capacity in MW
+        self.capex_per_mw = 2500        # CAPEX in €/MW
+        self.opex_per_mw = 0.03 * 2500 # OPEX in €/MW
+        self.hourly_cf_file = None      # Path to hourly CF CSV
+        self.hourly_cf = None           # Loaded hourly CF array
 
+        # Computed attributes (filled on evaluate)
+        self.hourly_output_mw = None
+        self.cumulative_energy_gwh_total = None
+        self.cumulative_energy_gwh_hourly = None
+        self.avg_capacity_factor = None
+        self.capex = None
+        self.opex = None
+
+    def show_defaults(self):
+        """Show default values and units for user reference."""
+        defaults = {
+            'capacity_mw': 'MW, default 100',
+            'capex_per_mw': '€/MW, default 2500',
+            'opex_per_mw': '€/MW, default 0.03*CAPEX',
+            'hourly_cf_file': 'CSV path, default packaged sample_wind_cf.csv'
+        }
+        for k, v in defaults.items():
+            print(f"{k}: {v}")
 
     def configure(self, config=None, config_file=None, csv_file=None):
-
-        """Load configuration from YAML file or use defaults or use overides from user"""
-
-        if config is not None:
-            cfg = config
-        elif config_file is not None:
+        """Load configuration from YAML file, dictionary, or defaults."""
+        # Load user config or defaults
+        if config is None and config_file is not None:
             with open(config_file, 'r') as f:
-                cfg = yaml.safe_load(f)
-        else:
-            # Default values if nothing is provided
-            cfg = {
-                'capacity_mw': 100,       # default capacity
-                'capex_per_mw': 2500,     # default CAPEX
-                'opex_per_mw': 0.03*2500  # default OPEX
-            }
-            
+                config = yaml.safe_load(f)
 
-        self.capacity_mw = cfg.get('capacity_mw')
-        self.capex_per_mw = cfg.get('capex_per_mw')
-        self.opex_per_mw = cfg.get('opex_per_mw')
+        cfg = config if config is not None else {}
+        self.capacity_mw = cfg.get('capacity_mw', self.capacity_mw)
+        self.capex_per_mw = cfg.get('capex_per_mw', self.capex_per_mw)
+        self.opex_per_mw = cfg.get('opex_per_mw', self.opex_per_mw)
 
         if csv_file is not None:
             self.hourly_cf_file = csv_file
-        else:
+        elif self.hourly_cf_file is None:
             with resources.path('hytea.data', 'sample_wind_cf.csv') as p:
                 self.hourly_cf_file = str(p)
-
 
 
     def calculate_hourly_output(self):
@@ -79,4 +88,14 @@ class RenewableElectricity:
             'opex': self.capacity_mw * self.opex_per_mw
         }
 
+
+    def evaluate(self):
+        """Run all core methods and store results as attributes."""
+        
+        self.hourly_output_mw = self.calculate_hourly_output()
+        self.cumulative_energy_gwh_total = self.cumulative_energy_gwh(hourly=False)
+        self.cumulative_energy_gwh_hourly = self.cumulative_energy_gwh(hourly=True)
+        self.avg_capacity_factor = self.average_capacity_factor()
+        self.capex = self.get_capex_opex('capex')
+        self.opex = self.get_capex_opex('opex')
 
