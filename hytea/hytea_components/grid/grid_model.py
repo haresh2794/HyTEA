@@ -6,57 +6,61 @@ from importlib import resources  # allows access to files included in the packag
 #All files developed and tested on COLAB and pasted
 
 class Grid:
-
-    """Grid electricity component for HyTEA library: calculates weighted RES-E CF, electricity price trends, GHG intensity, and purchase/sales prices."""
+    """Grid electricity component for HyTEA library:
+    calculates weighted RES-E CF, electricity price trends, GHG intensity, 
+    and purchase/sales prices.
+    """
 
     def __init__(self):
-        self.hourly_cf_mul = None       # multiple CFs in one np array
-        self.ratios = None
-        self.avg_grid_price = None
-        self.difference = None
-        self.ghg_avg = None
-        self.peak_hours = (17, 18)
-        
+        # Core attributes
+        self.hourly_cf_mul = None         # np.array, multiple CFs in one array
+        self.ratios = [1]                 # ratio between CFs
+        self.avg_grid_price = 100         # €/MWh
+        self.difference = 50              # €/MWh
+        self.ghg_avg = 300                # gCO2/kWh
+        self.peak_hours = (17, 18)        # zero-based hour indices
 
-    def configure(self, config=None,hourly_cf_mul=None, config_file=None):
+        # Computed attributes (filled on evaluate)
+        self.hourly_weighted_cf = None
+        self.hourly_price_trend = None
+        self.hourly_purchase_price_trend = None
+        self.hourly_sales_price_trend = None
+        self.hourly_ghg_trend = None
 
-        """Load configuration from YAML file or use defaults or use overides from user"""
+    def show_defaults(self):
+        """Show the default values and units for user reference."""
+        defaults = {
+            'ratios': 'list, ratio between CFs, default [1]',
+            'avg_grid_price': '€/MWh, default 100',
+            'difference': '€/MWh, default 50',
+            'ghg_avg': 'gCO2/kWh, default 300',
+            'peak_hours': 'tuple of hours (0-23), default (17,18)',
+            'hourly_cf_mul': 'np.array of CFs, shape=(8760, n_sources), default loaded from package CSV'
+        }
+        for k, v in defaults.items():
+            print(f"{k}: {v}")
 
-        if config is not None:
-            cfg = config
-        elif config_file is not None:
+    def configure(self, config=None, hourly_cf_mul=None, config_file=None):
+        """Load configuration from YAML file, dictionary, or defaults."""
+        # Load user config or defaults
+        if config is None and config_file is not None:
             with open(config_file, 'r') as f:
-                cfg = yaml.safe_load(f)
-        else:
-            # Default values if nothing is provided
-            cfg = {
-                'ratios': [1],       # default ratio between CF1 and CF2
-                'avg_grid_price': 100,     # default average price
-                'difference': 50,  # default difference between sales and purchase price
-                'ghg_avg': 300, # default average ghg price
-                'peak_hours': (17, 18) # default peak hours
-            }
-            
+                config = yaml.safe_load(f)
 
-        self.ratios = cfg.get('ratios')
-        self.avg_grid_price = cfg.get('avg_grid_price')
-        self.difference = cfg.get('difference')
-        self.ghg_avg = cfg.get('ghg_avg')
-        self.peak_hours = cfg.get('peak_hours')
+        cfg = config if config is not None else {}
+        self.ratios = cfg.get('ratios', self.ratios)
+        self.avg_grid_price = cfg.get('avg_grid_price', self.avg_grid_price)
+        self.difference = cfg.get('difference', self.difference)
+        self.ghg_avg = cfg.get('ghg_avg', self.ghg_avg)
+        self.peak_hours = cfg.get('peak_hours', self.peak_hours)
 
-
-
+        # Load hourly CF
         if hourly_cf_mul is not None:
-            # Assume user already passes a NumPy array or array-like
             self.hourly_cf_mul = np.asarray(hourly_cf_mul, dtype=float)
-
-        else:
-            # Load packaged CSV and convert to NumPy array
+        elif self.hourly_cf_mul is None:
             with resources.path("hytea.data", "hourly_cf_mul.csv") as p:
                 df = pd.read_csv(p)
                 self.hourly_cf_mul = df.values.astype(float)
-        
-        # For the grid the weighted res e capacity factor has to be done through the core else we will be not able to have multiple renewable energy sources at a time
 
     def weighted_res_e_cf(self):
         """
@@ -152,3 +156,11 @@ class Grid:
         ghg_trend = self.grid_electricity_price_trend()
         avg_trend = np.mean(ghg_trend)
         return (ghg_trend / avg_trend) * self.ghg_avg
+
+    def evaluate(self):
+        """Run all core methods and store results as attributes."""
+        self.hourly_weighted_cf = self.weighted_res_e_cf()
+        self.hourly_price_trend = self.grid_electricity_price_trend()
+        self.hourly_purchase_price_trend = self.purchase_price()
+        self.hourly_sales_price_trend = self.sales_price()
+        self.hourly_ghg_trend = self.ghg_intensity()
