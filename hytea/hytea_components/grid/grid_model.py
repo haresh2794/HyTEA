@@ -157,10 +157,27 @@ class Grid:
         avg_trend = np.mean(ghg_trend)
         return (ghg_trend / avg_trend) * self.ghg_avg
 
+
+
     def evaluate(self):
-        """Run all core methods and store results as attributes."""
-        self.hourly_weighted_cf = self.weighted_res_e_cf()
-        self.hourly_price_trend = self.grid_electricity_price_trend()
-        self.hourly_purchase_price_trend = self.purchase_price()
-        self.hourly_sales_price_trend = self.sales_price()
-        self.hourly_ghg_trend = self.ghg_intensity()
+        """Run all core methods, store results as attributes, and return dictionary."""
+        
+        h_weighted_cf = self.weighted_res_e_cf()
+        h_price_trend = self.grid_electricity_price_trend()
+        h_purchase_price_trend = self.purchase_price()
+        h_sales_price_trend = self.sales_price()
+        h_ghg_trend = self.ghg_intensity()
+
+        self.hourly_weighted_cf = h_weighted_cf
+        self.hourly_price_trend = h_price_trend
+        self.hourly_purchase_price_trend = h_purchase_price_trend
+        self.hourly_sales_price_trend = h_sales_price_trend
+        self.hourly_ghg_trend = h_ghg_trend
+
+        return {
+            "hourly_weighted_cf": h_weighted_cf,
+            "hourly_price_trend":  h_price_trend,
+            "hourly_purchase_price_trend": h_purchase_price_trend,
+            "hourly_sales_price_trend": h_sales_price_trend,
+            "hourly_ghg_trend": h_ghg_trend,
+        }

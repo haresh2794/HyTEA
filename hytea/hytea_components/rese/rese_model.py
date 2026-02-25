@@ -90,12 +90,30 @@ class RenewableElectricity:
 
 
     def evaluate(self):
-        """Run all core methods and store results as attributes."""
-        
-        self.hourly_output_mw = self.calculate_hourly_output()
-        self.cumulative_energy_gwh_total = self.cumulative_energy_gwh(hourly=False)
-        self.cumulative_energy_gwh_hourly = self.cumulative_energy_gwh(hourly=True)
-        self.avg_capacity_factor = self.average_capacity_factor()
-        self.capex = self.get_capex_opex('capex')
-        self.opex = self.get_capex_opex('opex')
+        """Run all core methods, store results as attributes, and return dictionary."""
 
+        # Compute values
+        hourly_output_mw = self.calculate_hourly_output()
+        cumulative_energy_gwh_total = self.cumulative_energy_gwh(hourly=False)
+        cumulative_energy_gwh_hourly = self.cumulative_energy_gwh(hourly=True)
+        avg_capacity_factor = self.average_capacity_factor()
+        capex = self.get_capex_opex('capex')
+        opex = self.get_capex_opex('opex')
+
+        # Store as attributes
+        self.hourly_output_mw = hourly_output_mw
+        self.cumulative_energy_gwh_total = cumulative_energy_gwh_total
+        self.cumulative_energy_gwh_hourly = cumulative_energy_gwh_hourly
+        self.avg_capacity_factor = avg_capacity_factor
+        self.capex = capex
+        self.opex = opex
+
+        # Return as dictionary
+        return {
+            "hourly_output_mw": hourly_output_mw,
+            "cumulative_energy_gwh_total": cumulative_energy_gwh_total,
+            "cumulative_energy_gwh_hourly": cumulative_energy_gwh_hourly,
+            "avg_capacity_factor": avg_capacity_factor,
+            "capex": capex,
+            "opex": opex,
+        }
