@@ -26,6 +26,8 @@ class ALKElectrolyser:
             20: 1.020301014,
             100: 1.041557285
         }
+        self.spec_capex = None
+        self.opex_per = None
         # Totals
         self.total_energy_electrolysis_kWh = None
         self.total_h2_kg = None
@@ -34,6 +36,8 @@ class ALKElectrolyser:
         self.total_transport_energy_kWh = None
         self.total_water_m3 = None
         self.capacity_factor = None
+        self.capex = None
+        self.opex = None
 
         # Stream-level
         self.streams_power_used_kW = {}
@@ -66,7 +70,12 @@ class ALKElectrolyser:
     def _default_electro_capacity(self):
         return 4  # MW
 
-
+    def _default_spec_capex(self):
+        return 740 #€/kW
+    
+    def _default_opex_per(self):
+        return 0.03 #fraction of capex
+    
     def _default_avg_sec_electrolyser(self, capacity):
         """
         Average electrolyser specific energy consumption (SEC)
@@ -152,6 +161,15 @@ class ALKElectrolyser:
         self.LHV_h2 = cfg.get(
             'LHV',
             self._default_LHV()
+        )
+
+        self.spec_capex = cfg.get(
+            'spec_capex',
+            self._default_spec_capex()
+        )
+        self.opex_per = cfg.get(
+            'opex_per',
+            self._default_opex_per()
         )
 
     def show_defaults(self):
@@ -286,6 +304,12 @@ class ALKElectrolyser:
         # Remaining electrolyser power to allocate (hourly)
         remaining_power_kW = power_used_kW.copy()
 
+        #Capex and OPEX
+
+        capex = self.spec_capex*self.electro_capacity
+        opex = self.opex_per*capex
+
+
         for col in power_df.columns:
             stream_power_kW = power_df[col].values
 
@@ -340,7 +364,9 @@ class ALKElectrolyser:
             "compression_energy_kWh": compression_energy_kWh.sum(),
             "transport_energy_kWh": transport_energy_kWh.sum(),
             "water_m3": water_m3.sum(),
-            "capacity_factor": energy_used_kWh.sum() / (actual_capacity * hours)
+            "capacity_factor": energy_used_kWh.sum() / (actual_capacity * hours),
+            "capex":capex,
+            "opex":opex
         }
     
         # ======================
@@ -353,7 +379,8 @@ class ALKElectrolyser:
         self.total_transport_energy_kWh = transport_energy_kWh.sum()
         self.total_water_m3 = water_m3.sum()
         self.capacity_factor = energy_used_kWh.sum() / (actual_capacity * hours)
-
+        self.capex = capex
+        self.opex = opex
         # ======================
         # hourly
         # ======================
