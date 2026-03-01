@@ -28,6 +28,7 @@ class ALKElectrolyser:
         }
         self.spec_capex = None
         self.opex_per = None
+        self.outlet_pressure = None
         # Totals
         self.total_energy_electrolysis_kWh = None
         self.total_h2_kg = None
@@ -75,6 +76,9 @@ class ALKElectrolyser:
     
     def _default_opex_per(self):
         return 0.03 #fraction of capex
+    
+    def _default_outlet_pressure():
+        return 15 #bar
     
     def _default_avg_sec_electrolyser(self, capacity):
         """
@@ -170,6 +174,11 @@ class ALKElectrolyser:
         self.opex_per = cfg.get(
             'opex_per',
             self._default_opex_per()
+        )
+
+        self.outlet_pressure = cfg.get(
+            'outlet_pressure',
+            self._default_outlet_pressure()
         )
 
     def show_defaults(self):
@@ -366,7 +375,8 @@ class ALKElectrolyser:
             "water_m3": water_m3.sum(),
             "capacity_factor": energy_used_kWh.sum() / (actual_capacity * hours),
             "capex":capex,
-            "opex":opex
+            "opex":opex,
+            "outlet_pressure": self.outlet_pressure
         }
     
         # ======================
