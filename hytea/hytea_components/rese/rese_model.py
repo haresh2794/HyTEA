@@ -10,9 +10,10 @@ class RenewableElectricity:
 
     def __init__(self):
         # Core attributes
+        self.rese_type = 'wind'         # wind or solar
         self.capacity_mw = 100          # Installed capacity in MW
-        self.capex_per_mw = 2500        # CAPEX in €/MW
-        self.opex_per_mw = 0.03 * 2500 # OPEX in €/MW
+        self.capex_per_mw = None        # CAPEX in €/MW
+        self.opex_per_mw = None  # OPEX in €/MW
         self.hourly_cf_file = None      # Path to hourly CF CSV
         self.hourly_cf = None           # Loaded hourly CF array
 
@@ -27,9 +28,10 @@ class RenewableElectricity:
     def show_defaults(self):
         """Show default values and units for user reference."""
         defaults = {
+            'rese_type': 'default wind, options: wind/solar',
             'capacity_mw': 'MW, default 100',
-            'capex_per_mw': '€/MW, default 2500',
-            'opex_per_mw': '€/MW, default 0.03*CAPEX',
+            'capex_per_mw': '€/MW, default 2500 for wind, 1000 for solar',
+            'opex_per_mw': '€/MW, default 0.03*CAPEX for wind, 0.02*CAPEX for solar',
             'hourly_cf_file': 'CSV path, default packaged sample_wind_cf.csv'
         }
         for k, v in defaults.items():
@@ -43,16 +45,25 @@ class RenewableElectricity:
                 config = yaml.safe_load(f)
 
         cfg = config if config is not None else {}
+
+        self.rese_type = cfg.get('rese_type', self.rese_type)
+
+        if self.rese_type == 'solar':
+            default_capex_per_mw = 1000
+            default_opex_per_mw = 0.02 * 1000
+        else:
+            default_capex_per_mw = 2500
+            default_opex_per_mw = 0.03 * 2500
+
         self.capacity_mw = cfg.get('capacity_mw', self.capacity_mw)
-        self.capex_per_mw = cfg.get('capex_per_mw', self.capex_per_mw)
-        self.opex_per_mw = cfg.get('opex_per_mw', self.opex_per_mw)
+        self.capex_per_mw = cfg.get('capex_per_mw', default_capex_per_mw)
+        self.opex_per_mw = cfg.get('opex_per_mw', default_opex_per_mw)
 
         if csv_file is not None:
             self.hourly_cf_file = csv_file
         elif self.hourly_cf_file is None:
             with resources.path('hytea.data', 'sample_wind_cf.csv') as p:
                 self.hourly_cf_file = str(p)
-
 
     def calculate_hourly_output(self):
 
@@ -88,7 +99,6 @@ class RenewableElectricity:
             'opex': self.capacity_mw * self.opex_per_mw
         }
 
-
     def evaluate(self):
         """Run all core methods, store results as attributes, and return dictionary."""
 
@@ -97,8 +107,9 @@ class RenewableElectricity:
         cumulative_energy_gwh_total = self.cumulative_energy_gwh(hourly=False)
         cumulative_energy_gwh_hourly = self.cumulative_energy_gwh(hourly=True)
         avg_capacity_factor = self.average_capacity_factor()
-        capex = self.get_capex_opex('capex')
-        opex = self.get_capex_opex('opex')
+        costs = self.get_capex_opex()
+        capex = costs['capex']
+        opex = costs['opex']
 
         # Store as attributes
         self.hourly_output_mw = hourly_output_mw
