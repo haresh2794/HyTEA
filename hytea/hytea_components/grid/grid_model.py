@@ -26,6 +26,9 @@ class Grid:
         self.hourly_purchase_price_trend = None
         self.hourly_sales_price_trend = None
         self.hourly_ghg_trend = None
+        
+        self.avg_price_trend = None
+        self.avg_ghg_trend = None
 
     def show_defaults(self):
         """Show the default values and units for user reference."""
@@ -136,10 +139,10 @@ class Grid:
         if self.avg_grid_price is None:
             raise ValueError("avg_grid_price must be set before calling this method.")
         price_trend = self.grid_electricity_price_trend()
-        avg_trend = np.mean(price_trend)
+        self.avg_price_trend = np.mean(price_trend)
 
         #return avg_trend, The values are different compared to the excel sheet as the avg_trend value is different, this is because in the excel sheet only peak change for day 1 was considered, here it is repeated each day
-        return (price_trend / avg_trend) * self.avg_grid_price
+        return (price_trend / self.avg_price_trend) * self.avg_grid_price
 
 
     def sales_price(self):
@@ -154,8 +157,8 @@ class Grid:
         if self.ghg_avg is None:
             raise ValueError("ghg_avg must be set before calling this method.")
         ghg_trend = self.grid_electricity_price_trend()
-        avg_trend = np.mean(ghg_trend)
-        return (ghg_trend / avg_trend) * self.ghg_avg
+        self.avg_ghg_trend = np.mean(ghg_trend)
+        return (ghg_trend / self.avg_ghg_trend) * self.ghg_avg
 
 
 
@@ -180,4 +183,6 @@ class Grid:
             "hourly_purchase_price_trend": h_purchase_price_trend,
             "hourly_sales_price_trend": h_sales_price_trend,
             "hourly_ghg_trend": h_ghg_trend,
+            "avg_ghg_trend": self.avg_ghg_trend,
+            "avg_price_trend" :self.avg_price_trend
         }

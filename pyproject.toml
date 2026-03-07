@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "hytea"
-version = "0.7.4.1"
+version = "0.7.5"
 description = "Hydrogen supply chain techno-economic analysis library"
 authors = [
     { name="Haresh", email="hareshmvc@gmail.com" }
