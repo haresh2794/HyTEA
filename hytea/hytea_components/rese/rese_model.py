@@ -69,7 +69,7 @@ class RenewableElectricity:
 
         """Calculate hourly electricity output in MW from capacity factor data sheet and installed capacity"""
 
-        df = pd.read_csv(self.hourly_cf_file)
+        df = pd.read_csv(self.hourly_cf_file, sep=None, engine='python')
         self.hourly_cf = df['cf'].values
         return self.hourly_cf * self.capacity_mw
 
