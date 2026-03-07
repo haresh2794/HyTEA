@@ -231,7 +231,14 @@ class ALKElectrolyser:
             self.transport_pressure  = cfg.get('transport_pressure', self._default_transport_pressure())
             self.sec_transport= cfg.get('sec_transport',max(0.0, self.calc_sec_boost(self.transport_pressure) - self.calc_sec_boost(self.pout_bar)))
             
-        
+    def get_actual_input_capacity_kW(self):
+        """
+        Return the maximum total power input accepted by the electrolyser system [kW],
+        including compression and transport energy overheads.
+        """
+        electro_capacity_kW = self.electro_capacity * 1000
+        add_percentage = (self.sec_compression + self.sec_transport) / self.avg_sec_electrolyser
+        return electro_capacity_kW * (1 + add_percentage)
 
     def show_defaults(self):
         """
