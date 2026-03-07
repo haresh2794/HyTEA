@@ -23,6 +23,8 @@ class HydrogenStorage:
         self.custom_specific_capex = None  # €/kg (optional override)
         self.capex_a = None
         self.capex_b = None
+        self.electro_capacity = None
+        self.avg_sec_electrolyser = None
 
         self.max_charge_rate_kgph = None     # kg/h
         self.max_discharge_rate_kgph = None  # kg/h
@@ -37,6 +39,8 @@ class HydrogenStorage:
         self.P0_bar = None
         self.energy_cost = None
         self.pout_bar = None
+        self.liq_storage_sec = None
+
         # Starting storage policy
         self.starting_storage_option = "Full storage"  # "Full storage" or "Hours"
         self.starting_storage_hours = 0.0              # only used if option == "Hours"
@@ -144,7 +148,26 @@ class HydrogenStorage:
             raise ValueError(f"No CAPEX parameters defined for storage type '{self.storage_method}'")
         return 0.9 * 10 ** (
             1.0 / (self.capex_a * np.log10(capacity_kg) + self.capex_b))
-        
+    
+    def _default_electro_capacity(self):
+        return 4  # MW   
+    
+    def _default_avg_sec_electrolyser(self, capacity):
+        """
+        Average electrolyser specific energy consumption (SEC)
+        y = c * x^b
+        """
+        c = 0.018577706
+        b = -0.028315417
+
+        return (1/c) * (capacity ** b)
+    
+    def _default_liq_storage_sec(self):
+            liq_h2_initial_sizing = 1000*self.electro_capacity(1+(10/self.avg_sec_electrolyser))/(self.avg_sec_electrolyser+10)
+            x = min(25.495937660557*liq_h2_initial_sizing**(-0.116967960344646),0.45*33.3)
+
+            return x
+
     # -----------------------------------------------------
     # CONFIGURATION
     # -----------------------------------------------------
@@ -187,6 +210,7 @@ class HydrogenStorage:
         self.starting_storage_hours = float(cfg.get("starting_storage_hours", 0.0))
 
         self.sec_compressor = cfg.get("storage_com_sec", self.calc_sec_boost(self.pout_bar))
+     
 
         # Rate limits (default infinite if not provided)
         self.max_charge_rate_kgph = cfg.get("max_charge_rate_kgph", np.inf)
@@ -207,6 +231,18 @@ class HydrogenStorage:
                 f"Got {len(self.hourly_demand_kgph)} vs {len(self.hourly_production_kgph)}."
             )
         
+        self.electro_capacity = cfg.get(
+            'electro_capacity',
+            self._default_electro_capacity()
+        )
+
+        self.avg_sec_electrolyser = cfg.get(
+            'avg_sec_electrolyser',
+            self._default_avg_sec_electrolyser(self.electro_capacity)
+        )
+
+        if self.storage_method == "Liquid H2":
+            self.liq_storage_sec = cfg.get("liq_storage_sec", self._default_liq_storage_sec())
 
     # -----------------------------------------------------
     # HOURLY ANALYSIS 
@@ -289,11 +325,12 @@ class HydrogenStorage:
         else:
             self.total_storage_capex = self.storage_specific_capex * capacity_kg*self.fos
 
-
+        
         #------------OPEX calculation--------------
         if self.storage_method == "Liquid H2":
+
             #calculated differently
-            self.total_storage_opex = self.total_storage_capex*0.02 + min(25.495937660557*max_hourly_prod_kgph**(-0.116967960344646),0.45*33.3)*self.energy_cost*sum(prod_kgph)
+            self.total_storage_opex = self.total_storage_capex*0.02 + self.liq_storage_sec*self.energy_cost*sum(prod_kgph)
             
         else:
             self.total_storage_opex = self.total_storage_capex*0.02 + self.sec_compressor*self.energy_cost*sum(prod_kgph)

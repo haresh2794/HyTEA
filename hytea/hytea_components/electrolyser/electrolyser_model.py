@@ -64,6 +64,23 @@ class ALKElectrolyser:
         self.hourly_efficiency = None
         self.hourly_sec_electrolyser = None
         self.hourly_load = None
+
+        #calculating the energy for storage for inclusion in H2 production energy requirement
+        self.storage_defaults = {
+            "Compressed Tanks": {"pressure_bar": 300, "temperature_C": 25},
+            "Salt cavern(s)":   {"pressure_bar": 200, "temperature_C": 25},
+            "Lined rock cavern":{"pressure_bar": 150, "temperature_C": 25},
+            "Liquid H2":        {"pressure_bar": 1,   "temperature_C": -253},
+        }
+        
+        self.transport_pressure = None
+
+        self._lookup_boost_sec_table = {
+                            0:  (0.00433, 4.13),
+                            15: (0.00367, 1.72),
+                            30: (0.00333, 1.13),
+                            60: (0.00300, 0.68)
+                        }
        
 
     # ---------- Default calculation methods ----------
@@ -110,6 +127,30 @@ class ALKElectrolyser:
 
     def _default_LHV(self):
         return 33.33
+    
+    def _default_liq_storage_sec(self):
+            
+        liq_h2_initial_sizing = 1000*self.electro_capacity(1+(10/self.avg_sec_electrolyser))/(self.avg_sec_electrolyser+10)
+        x = min(25.495937660557*liq_h2_initial_sizing**(-0.116967960344646),0.45*33.3)
+
+        return x
+    
+    def calc_sec_boost(self, P_target):
+        """
+        Specific compression energy (kWh/kg) from outlet_pressure to P_target.
+        """
+        if self.outlet_pressure not in self._lookup_boost_sec_table:
+            raise ValueError("outlet_pressure must be one of: 0, 15, 30, 60 barg")
+
+        slope, intercept = self._lookup_boost_sec_table[self.outlet_pressure]
+
+        if P_target <= self.outlet_pressure:
+            return 0.0
+        
+        return slope * (P_target - self.outlet_pressure) + intercept
+    
+    def _default_transport_pressure(self):
+        return 350
 
     # ---------- Configuration loader ----------
 
@@ -138,15 +179,6 @@ class ALKElectrolyser:
             self._default_avg_sec_electrolyser(self.electro_capacity)
         )
 
-        self.sec_compression = cfg.get(
-            'sec_compression', #should be from stroage
-            self._default_sec_compression()
-        )
-
-        self.sec_transport = cfg.get(
-            'sec_transport', # value should come from transport throught core
-            self._default_sec_transport()
-        )
 
         self.water_consumption = cfg.get(
             'water_consumption', #specific water consumption
@@ -181,6 +213,34 @@ class ALKElectrolyser:
             self._default_outlet_pressure()
         )
 
+        #-------storage_ energy consumption
+
+        self.storage_method = cfg.get("storage_method", "Compressed Tanks")
+        if self.storage_method not in self.storage_defaults:
+            raise ValueError(f"Unknown storage_method: {self.storage_method}")
+
+        defaults_store = self.storage_defaults[self.storage_method]
+        self.pout_bar = cfg.get("pout_bar", defaults_store["pressure_bar"])
+
+        if self.storage_method == "Liquid H2":
+            self.sec_compression = cfg.get(
+            'sec_compression', #should be from stroage
+            self._default_liq_storage_sec())
+        else: 
+            self.sec_compression = cfg.get('sec_compression',self.calc_sec_boost(self.pout_bar) )
+
+
+        #-----Transport specific energy consumption-------------
+
+        if self.storage_method == "Liquid H2":
+            self.transport_pressure = cfg.get('transport_pressure', 0)
+            self.sec_transport= cfg.get('sec_transport',0)
+        else: 
+            self.transport_pressure  = cfg.get('transport_pressure', self._default_transport_pressure())
+            self.sec_transport= cfg.get('sec_transport',self.calc_sec_boost(self.transport_pressure)-self.calc_sec_boost(self.pout_bar))
+            
+        
+
     def show_defaults(self):
         """
         Show all configurable parameters with their default values and units.
@@ -189,8 +249,6 @@ class ALKElectrolyser:
         defaults_with_units = {
             'electro_capacity': (self._default_electro_capacity(), 'MW'),
             'avg_sec_electrolyser': (self._default_avg_sec_electrolyser(self._default_electro_capacity()), 'kWh/kg H2'),
-            'sec_compression': (self._default_sec_compression(), 'kWh/kg H2'),
-            'sec_transport': (self._default_sec_transport(), 'kWh/kg H2'),
             'water_consumption': (self._default_water_consumption(), 'm3/kg H2'),
             'annual_improvement': (self._default_annual_improvement(), 'fraction'),
             'install_year': (self._default_install_year(), ''),
@@ -273,7 +331,7 @@ class ALKElectrolyser:
         # ======================
         # Power domain (kW)
         # ======================
-        add_percentage = (self.sec_compression)/self.avg_sec_electrolyser #Additional percentage for compression/liquefaction & transportation (self.sec_compression+self.sec_transport ???? )/self.avg_sec_electrolyser
+        add_percentage = (self.sec_compression+self.sec_transport)/self.avg_sec_electrolyser #Additional percentage for compression/liquefaction & transportation (self.sec_compression+self.sec_transport ???? )/self.avg_sec_electrolyser
         total_power_kW = power_df.sum(axis=1).values
         actual_capacity = self.electro_capacity*(1+add_percentage)
         power_used_kW = np.minimum(total_power_kW, actual_capacity)
