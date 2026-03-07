@@ -107,14 +107,6 @@ class ALKElectrolyser:
 
         return (1/c) * (capacity ** b)
 
-    def _default_sec_compression(self):
-        # default compressor specific energy consumption
-        return 0.86
-
-    def _default_sec_transport(self):
-        # default transport specific energy consumption
-        return 0.69
-
     def _default_water_consumption(self):
         # default water consumption
         return 0.0015
@@ -130,7 +122,7 @@ class ALKElectrolyser:
     
     def _default_liq_storage_sec(self):
             
-        liq_h2_initial_sizing = 1000*self.electro_capacity(1+(10/self.avg_sec_electrolyser))/(self.avg_sec_electrolyser+10)
+        liq_h2_initial_sizing = liq_h2_initial_sizing = 1000 * self.electro_capacity * (1 + (10 / self.avg_sec_electrolyser)) / (self.avg_sec_electrolyser + 10)
         x = min(25.495937660557*liq_h2_initial_sizing**(-0.116967960344646),0.45*33.3)
 
         return x
@@ -237,7 +229,7 @@ class ALKElectrolyser:
             self.sec_transport= cfg.get('sec_transport',0)
         else: 
             self.transport_pressure  = cfg.get('transport_pressure', self._default_transport_pressure())
-            self.sec_transport= cfg.get('sec_transport',self.calc_sec_boost(self.transport_pressure)-self.calc_sec_boost(self.pout_bar))
+            self.sec_transport= cfg.get('sec_transport',max(0.0, self.calc_sec_boost(self.transport_pressure) - self.calc_sec_boost(self.pout_bar)))
             
         
 
@@ -266,7 +258,7 @@ class ALKElectrolyser:
         return {key: value for key, (value, _) in defaults_with_units.items()}
 
     def h2_from_energy_kWh(self, energy_kWh,sec_electrolyser):
-        total_sec = sec_electrolyser + self.sec_compression
+        total_sec = sec_electrolyser + self.sec_compression+self.sec_transport
         return energy_kWh / total_sec
 
 
@@ -324,8 +316,26 @@ class ALKElectrolyser:
         dict
             Hourly arrays + totals (unit consistent)
         """
+        if not isinstance(power_df, pd.DataFrame):
+            raise TypeError("power_df must be a pandas DataFrame.")
 
+        if power_df.isnull().any().any():
+            raise ValueError("power_df contains NaN values.")
+
+        if (power_df < 0).any().any():
+            raise ValueError("power_df must not contain negative values.")
+        
         hours = len(power_df)
+        self.streams_power_used_kW = {}
+        self.streams_power_used_MW = {}
+        self.streams_power_curtailed_kW = {}
+        self.streams_power_curtailed_MW = {}
+        self.streams_energy_used_kWh = {}
+        self.streams_energy_used_MWh = {}
+        self.streams_H2_kg = {}
+        self.streams_totals_energy_used_kWh = {}
+        self.streams_totals_energy_curtailed_kWh = {}
+        self.streams_totals_H2_kg = {}
 
        
         # ======================
@@ -333,8 +343,9 @@ class ALKElectrolyser:
         # ======================
         add_percentage = (self.sec_compression+self.sec_transport)/self.avg_sec_electrolyser #Additional percentage for compression/liquefaction & transportation (self.sec_compression+self.sec_transport ???? )/self.avg_sec_electrolyser
         total_power_kW = power_df.sum(axis=1).values
-        actual_capacity = self.electro_capacity*(1+add_percentage)
-        power_used_kW = np.minimum(total_power_kW, actual_capacity)
+        electro_capacity_kW = self.electro_capacity * 1000
+        actual_capacity_kW = electro_capacity_kW * (1 + add_percentage)
+        power_used_kW = np.minimum(total_power_kW, actual_capacity_kW)
         power_curtailed_kW = total_power_kW - power_used_kW
 
        
@@ -342,15 +353,25 @@ class ALKElectrolyser:
         # Energy domain (kWh) – Δt = 1 h
         # ======================
         energy_used_kWh = power_used_kW.copy()
-        load = power_used_kW/self.electro_capacity
-        efficiency = self.electrolyser_efficiency(load*100, self.electro_capacity, self.install_year)
+       
+        load = power_used_kW / electro_capacity_kW
+        efficiency = self.electrolyser_efficiency(load * 100, self.electro_capacity, self.install_year)
+        efficiency = np.where(power_used_kW > 0, efficiency, 0.0)
 
-        sec_electrolyser = self.LHV_h2/efficiency
+        sec_electrolyser = np.where(
+            efficiency > 0,
+            self.LHV_h2 / efficiency,
+            np.inf
+        )
 
         # ======================
         # Hydrogen production (kg/h)
         # ======================
-        h2_hourly_kg = self.h2_from_energy_kWh(energy_used_kWh,sec_electrolyser)
+        h2_hourly_kg = np.where(
+            energy_used_kWh > 0,
+            self.h2_from_energy_kWh(energy_used_kWh, sec_electrolyser),
+            0.0
+)
 
         
       
@@ -373,7 +394,7 @@ class ALKElectrolyser:
 
         #Capex and OPEX
 
-        capex = self.spec_capex*self.electro_capacity
+        capex = self.spec_capex*self.electro_capacity*1000
         opex = self.opex_per*capex
 
 
@@ -431,7 +452,7 @@ class ALKElectrolyser:
             "compression_energy_kWh": compression_energy_kWh.sum(),
             "transport_energy_kWh": transport_energy_kWh.sum(),
             "water_m3": water_m3.sum(),
-            "capacity_factor": energy_used_kWh.sum() / (actual_capacity * hours),
+            "capacity_factor": energy_used_kWh.sum() / (actual_capacity_kW * hours),
             "capex":capex,
             "opex":opex,
             "outlet_pressure": self.outlet_pressure
@@ -446,7 +467,7 @@ class ALKElectrolyser:
         self.total_compression_energy_kWh = compression_energy_kWh.sum()
         self.total_transport_energy_kWh = transport_energy_kWh.sum()
         self.total_water_m3 = water_m3.sum()
-        self.capacity_factor = energy_used_kWh.sum() / (actual_capacity * hours)
+        self.capacity_factor = energy_used_kWh.sum() / (actual_capacity_kW * hours)
         self.capex = capex
         self.opex = opex
         # ======================
