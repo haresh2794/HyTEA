@@ -1,24 +1,29 @@
 import numpy as np
+import pandas as pd
+
 from hytea.hytea_components.rese.rese_model import RenewableElectricity
 from hytea.hytea_components.grid.grid_model import Grid
+from hytea.hytea_components.electrolyser.electrolyser_model import ALKElectrolyser
 
 
 class HyTEACore:
     """
-    HyTEA Core - Version 2
+    HyTEA Core - Version 3
 
     Responsibilities:
-    - accept simple scenario configuration
     - run multiple RESE sources
-    - preserve source-wise outputs
-    - aggregate combined RESE outputs
-    - build hourly_cf_mul from source CF arrays
-    - run Grid only if grid is integrated
+    - aggregate RESE outputs
+    - build hourly_cf_mul for Grid
+    - run Grid only if integrated
+    - configure Electrolyser
+    - calculate residual grid stream required to meet electrolyser input capacity
+    - build final stream-wise power DataFrame in kW
+    - run Electrolyser with RESE + optional Grid stream
 
-    Version 2 scope:
+    Current scope:
     - RESE
     - optional Grid
-    - no electrolyser
+    - Electrolyser
     - no storage
     - no transport
     - no finance
@@ -26,12 +31,20 @@ class HyTEACore:
 
     def __init__(self):
         self.config = {}
+
         self.rese_models = {}
         self.rese_results = {}
         self.aggregated_results = {}
+
         self.grid_model = None
         self.grid_results = {}
         self.grid_summary = {}
+
+        self.electrolyser_model = None
+        self.electrolyser_results = {}
+
+        self.power_df = None
+        self.grid_stream_kW = None
 
     def configure(self, config):
         self.config = dict(config)
@@ -49,9 +62,11 @@ class HyTEACore:
         if len(self.config["rese_sources"]) == 0:
             raise ValueError("'rese_sources' cannot be empty.")
 
-        if self.config.get("integrate_grid", False):
-            if "grid" not in self.config:
-                raise ValueError("grid config is required when integrate_grid=True.")
+        if "electrolyser" not in self.config:
+            raise ValueError("config must contain 'electrolyser'.")
+
+        if self.config.get("integrate_grid", False) and "grid" not in self.config:
+            raise ValueError("grid config is required when integrate_grid=True.")
 
     def run_rese_sources(self):
         """
@@ -94,14 +109,12 @@ class HyTEACore:
         for source_name, result in self.rese_results.items():
             hourly_output = np.asarray(result["hourly_output_mw"], dtype=float)
             cumulative_hourly = np.asarray(result["cumulative_energy_gwh_hourly"], dtype=float)
-            capex = float(result["capex"])
-            opex = float(result["opex"])
 
             hourly_output_arrays.append(hourly_output)
             cumulative_hourly_arrays.append(cumulative_hourly)
 
-            total_capex += capex
-            total_opex += opex
+            total_capex += float(result["capex"])
+            total_opex += float(result["opex"])
 
         combined_hourly_output_mw = np.sum(hourly_output_arrays, axis=0)
         combined_cumulative_energy_gwh_hourly = np.sum(cumulative_hourly_arrays, axis=0)
@@ -125,8 +138,6 @@ class HyTEACore:
             (n_sources, 8760)
         not:
             (8760, n_sources)
-
-        So we stack source CF arrays row-wise.
         """
         if not self.rese_models:
             return None
@@ -142,8 +153,7 @@ class HyTEACore:
 
             cf_arrays.append(np.asarray(model.hourly_cf, dtype=float))
 
-        hourly_cf_mul = np.vstack(cf_arrays)
-        return hourly_cf_mul
+        return np.vstack(cf_arrays)
 
     def run_grid(self):
         """
@@ -165,27 +175,104 @@ class HyTEACore:
 
         self.grid_results = self.grid_model.evaluate()
 
-        # simple summary values
         self.grid_summary = {
-            "hourly_weighted_cf": self.grid_results["hourly_weighted_cf"],
-            "hourly_price_trend": self.grid_results["hourly_price_trend"],
-            "hourly_purchase_price_trend": self.grid_results["hourly_purchase_price_trend"],
-            "hourly_sales_price_trend": self.grid_results["hourly_sales_price_trend"],
-            "hourly_ghg_trend": self.grid_results["hourly_ghg_trend"],
             "avg_weighted_cf": float(np.mean(self.grid_results["hourly_weighted_cf"])),
             "avg_purchase_price": float(np.mean(self.grid_results["hourly_purchase_price_trend"])),
             "avg_sales_price": float(np.mean(self.grid_results["hourly_sales_price_trend"])),
             "avg_ghg_intensity": float(np.mean(self.grid_results["hourly_ghg_trend"])),
-            "avg_price_trend": float(np.mean(self.grid_results["avg_price_trend"])),
         }
 
         return self.grid_results
+
+    def setup_electrolyser(self):
+        """
+        Configure the electrolyser once so the core can access
+        the actual required input capacity before building the grid stream.
+        """
+        self.electrolyser_model = ALKElectrolyser()
+        self.electrolyser_model.configure(config=self.config.get("electrolyser", {}))
+        return self.electrolyser_model
+
+    def build_rese_power_df(self):
+        """
+        Build stream-wise RESE power DataFrame in kW.
+        """
+        stream_power = {}
+
+        for source_name, result in self.rese_results.items():
+            hourly_output_mw = np.asarray(result["hourly_output_mw"], dtype=float)
+            stream_power[source_name] = hourly_output_mw * 1000.0  # MW -> kW
+
+        if not stream_power:
+            raise ValueError("No RESE stream outputs available for electrolyser input.")
+
+        return pd.DataFrame(stream_power)
+
+    def build_grid_stream(self, rese_power_df):
+        """
+        Build hourly grid stream in kW as residual power required to meet
+        the electrolyser actual input capacity.
+
+        At this stage:
+        - if integrate_grid is False, returns zeros
+        - if integrate_grid is True, grid fills only the residual
+        - price and GHG caps are not yet applied
+        """
+        hours = len(rese_power_df)
+
+        if not self.config.get("integrate_grid", False):
+            self.grid_stream_kW = np.zeros(hours)
+            return self.grid_stream_kW
+
+        if self.electrolyser_model is None:
+            raise ValueError("Electrolyser must be configured before building grid stream.")
+
+        target_input_kW = self.electrolyser_model.get_actual_input_capacity_kW()
+
+        non_grid_total_kW = rese_power_df.sum(axis=1).to_numpy(dtype=float)
+        grid_power_kW = np.maximum(target_input_kW - non_grid_total_kW, 0.0)
+
+        self.grid_stream_kW = grid_power_kW
+        return self.grid_stream_kW
+
+    def build_power_df_for_electrolyser(self):
+        """
+        Build final stream-wise power DataFrame in kW for electrolyser.
+
+        Includes:
+        - RESE streams
+        - optional grid stream
+        """
+        rese_power_df = self.build_rese_power_df()
+        grid_stream_kW = self.build_grid_stream(rese_power_df)
+
+        power_df = rese_power_df.copy()
+
+        if self.config.get("integrate_grid", False):
+            power_df["grid"] = grid_stream_kW
+
+        self.power_df = power_df
+        return self.power_df
+
+    def run_electrolyser(self):
+        """
+        Run electrolyser with final stream-wise power DataFrame.
+        """
+        if self.electrolyser_model is None:
+            self.setup_electrolyser()
+
+        power_df = self.build_power_df_for_electrolyser()
+        self.electrolyser_results = self.electrolyser_model.evaluate(power_df=power_df)
+
+        return self.electrolyser_results
 
     def evaluate(self):
         self.validate_config()
         self.run_rese_sources()
         self.aggregate_rese_results()
         self.run_grid()
+        self.setup_electrolyser()
+        self.run_electrolyser()
 
         return {
             "scenario_name": self.config.get("scenario_name"),
@@ -193,4 +280,7 @@ class HyTEACore:
             "aggregated_results": self.aggregated_results,
             "grid_results": self.grid_results,
             "grid_summary": self.grid_summary,
+            "power_df": self.power_df,
+            "grid_stream_kW": self.grid_stream_kW,
+            "electrolyser_results": self.electrolyser_results,
         }
