@@ -49,11 +49,11 @@ class RenewableElectricity:
         self.rese_type = cfg.get('rese_type', self.rese_type)
 
         if self.rese_type == 'solar':
-            default_capex_per_mw = 1000
-            default_opex_per_mw = 0.02 * 1000
+            default_capex_per_mw = 1000000
+            default_opex_per_mw = 0.02 * 1000000
         else:
-            default_capex_per_mw = 2500
-            default_opex_per_mw = 0.03 * 2500
+            default_capex_per_mw = 2500000
+            default_opex_per_mw = 0.03 * 2500000
 
         self.capacity_mw = cfg.get('capacity_mw', self.capacity_mw)
         self.capex_per_mw = cfg.get('capex_per_mw', default_capex_per_mw)
