@@ -176,10 +176,16 @@ class HyTEACore:
         self.grid_results = self.grid_model.evaluate()
 
         self.grid_summary = {
+            "hourly_weighted_cf": self.grid_results["hourly_weighted_cf"],
+            "hourly_price_trend": self.grid_results["hourly_price_trend"],
+            "hourly_purchase_price_trend": self.grid_results["hourly_purchase_price_trend"],
+            "hourly_sales_price_trend": self.grid_results["hourly_sales_price_trend"],
+            "hourly_ghg_trend": self.grid_results["hourly_ghg_trend"],
             "avg_weighted_cf": float(np.mean(self.grid_results["hourly_weighted_cf"])),
             "avg_purchase_price": float(np.mean(self.grid_results["hourly_purchase_price_trend"])),
             "avg_sales_price": float(np.mean(self.grid_results["hourly_sales_price_trend"])),
             "avg_ghg_intensity": float(np.mean(self.grid_results["hourly_ghg_trend"])),
+            "avg_price_trend": float(np.mean(self.grid_results["avg_price_trend"])),
         }
 
         return self.grid_results
