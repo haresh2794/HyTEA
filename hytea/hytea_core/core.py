@@ -171,20 +171,33 @@ class HyTEACore:
         self.grid_results = self.grid_model.evaluate()
 
         self.grid_summary = {
+            "hourly_weighted_cf": self.grid_results["hourly_weighted_cf"],
+            "hourly_price_trend": self.grid_results["hourly_price_trend"],
+            "hourly_purchase_price_trend": self.grid_results["hourly_purchase_price_trend"],
+            "hourly_sales_price_trend": self.grid_results["hourly_sales_price_trend"],
+            "hourly_ghg_trend": self.grid_results["hourly_ghg_trend"],
             "avg_weighted_cf": float(np.mean(self.grid_results["hourly_weighted_cf"])),
             "avg_purchase_price": float(np.mean(self.grid_results["hourly_purchase_price_trend"])),
             "avg_sales_price": float(np.mean(self.grid_results["hourly_sales_price_trend"])),
             "avg_ghg_intensity": float(np.mean(self.grid_results["hourly_ghg_trend"])),
+             "avg_price_trend": float(np.mean(self.grid_results["avg_price_trend"])),
         }
 
         return self.grid_results
 
     def setup_electrolyser(self):
+        """
+        Configure the electrolyser once so the core can access
+        the actual required input capacity before building the grid stream.
+        """
         self.electrolyser_model = ALKElectrolyser()
         self.electrolyser_model.configure(config=self.config.get("electrolyser", {}))
         return self.electrolyser_model
 
     def build_rese_power_df(self):
+        """
+        Build stream-wise RESE power DataFrame in kW.
+        """
         stream_power = {}
 
         for source_name, result in self.rese_results.items():
@@ -197,6 +210,15 @@ class HyTEACore:
         return pd.DataFrame(stream_power)
 
     def build_grid_stream(self, rese_power_df):
+        """
+        Build hourly grid stream in kW as residual power required to meet
+        the electrolyser actual input capacity.
+
+        At this stage:
+        - if integrate_grid is False, returns zeros
+        - if integrate_grid is True, grid fills only the residual
+        - price and GHG caps are not yet applied
+        """
         hours = len(rese_power_df)
 
         if not self.config.get("integrate_grid", False):
@@ -236,6 +258,10 @@ class HyTEACore:
         return self.electrolyser_results
 
     def build_storage_config(self):
+        """
+        Build storage config by combining user-provided storage inputs
+        with internally available upstream electrolyser outputs.
+        """
         if not self.electrolyser_results:
             raise ValueError("Electrolyser results must exist before building storage config.")
 
@@ -255,6 +281,12 @@ class HyTEACore:
         return storage_config
 
     def run_storage(self):
+        """
+        Run storage using:
+        - user-provided storage config
+        - hourly electrolyser H2 production
+        - internally available electrolyser parameters
+        """
         storage_config = self.build_storage_config()
 
         self.storage_model = HydrogenStorage()
