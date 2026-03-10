@@ -40,7 +40,7 @@ class HydrogenTruckTransport:
 
         self.total_tractor_capex_as_opex = None
         self.total_salary = None
-        self.total_rectification = None
+        self.total_recertification = None
         self.total_fuel = None
         self.total_other_o_n_m = None
 
@@ -50,9 +50,26 @@ class HydrogenTruckTransport:
         self.truck_speed_kmh = None
 
         self.total_annual_h2_kg = None
-        self.tonne_transported_per_truck = None
-        self.truck_turns_per_year = None
+        self.tonnes_per_truck_kg = None
+        self.turns_per_truck = None
         self.annual_distance_per_truck_km = None
+        self.truck_speed_kmh = None
+
+        self.tractor_capex= None
+        self.spec_fuel_kWh_per_km= None
+        self.fuel_price_per_kWh= None
+        self.fuel_ghg_gCO2_per_kWh= None
+        self.drivers_per_truck= None
+        self.other_employees_per_truck= None
+        self.employee_salary= None
+        self.trailer_om_per_km= None
+        self.recertification_fraction= None
+        self.trailer_capex= None
+        self.opex_per_truck= None
+        self.booster_capex_total= None
+        self.booster_opex_total= None
+        self.turns_per_truck= None
+        self.tonnes_per_truck_kg= None
 
 
         self.tractor_cost_defaults = {
