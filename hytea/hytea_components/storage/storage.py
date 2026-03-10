@@ -36,10 +36,14 @@ class HydrogenStorage:
         self.hourly_production_kgph = None
         self.fos = None
         self.com_liq_included = None
-        self.P0_bar = None
+        self.p_in_bar = None
         self.energy_cost = None
         self.pout_bar = None
         self.liq_storage_sec = None
+        self.sec_compressor = None
+        self.total_storage_capex = None
+        self.total_storage_opex = None
+        self.outputs = None
 
         # Starting storage policy
         self.starting_storage_option = "Full storage"  # "Full storage" or "Hours"
@@ -98,7 +102,7 @@ class HydrogenStorage:
     #---Derivations--------
     def _calc_compressor_spec_capex(self, pout_bar, Q2_kgph):
         """
-        Compressor CAPEX for compression from P0_bar to pout_bar
+        Compressor CAPEX for compression from p_in_bar to pout_bar
         """
         table = {
             0:  (95.16475, 126.05269, -0.34019),
@@ -107,13 +111,13 @@ class HydrogenStorage:
             60: (61.065, 68.250, -0.340),
         }
 
-        pin = self.P0_bar
+        pin = self.p_in_bar
         Q = Q2_kgph
 
        
 
         if pin not in table:
-            raise ValueError("P0_bar must be one of: 0, 15, 30, 60 barg")
+            raise ValueError("p_in_bar must be one of: 0, 15, 30, 60 barg")
 
         A200, A500, B = table[pin]
 
@@ -125,17 +129,17 @@ class HydrogenStorage:
 
     def calc_sec_boost(self, P_target):
         """
-        Specific compression energy (kWh/kg) from P0_bar to P_target.
+        Specific compression energy (kWh/kg) from p_in_bar to P_target.
         """
-        if self.P0_bar not in self._lookup_boost_sec_table:
-            raise ValueError("P0_bar must be one of: 0, 15, 30, 60 barg")
+        if self.p_in_bar not in self._lookup_boost_sec_table:
+            raise ValueError("p_in_bar must be one of: 0, 15, 30, 60 barg")
 
-        slope, intercept = self._lookup_boost_sec_table[self.P0_bar]
+        slope, intercept = self._lookup_boost_sec_table[self.p_in_bar]
 
-        if P_target <= self.P0_bar:
+        if P_target <= self.p_in_bar:
             return 0.0
 
-        return slope * (P_target - self.P0_bar) + intercept
+        return slope * (P_target - self.p_in_bar) + intercept
 
     def _capex_liquid_h2(self, capacity_kg):
         capacity_tonnes = capacity_kg / 1000.0
@@ -163,7 +167,7 @@ class HydrogenStorage:
         return (1/c) * (capacity ** b)
     
     def _default_liq_storage_sec(self):
-            liq_h2_initial_sizing = 1000*self.electro_capacity(1+(10/self.avg_sec_electrolyser))/(self.avg_sec_electrolyser+10)
+            liq_h2_initial_sizing = 1000*self.electro_capacity*(1+(10/self.avg_sec_electrolyser))/(self.avg_sec_electrolyser+10)
             x = min(25.495937660557*liq_h2_initial_sizing**(-0.116967960344646),0.45*33.3)
 
             return x
@@ -199,7 +203,7 @@ class HydrogenStorage:
         cap_t = cfg.get("storage_capacity_tonnes", None)                               # if Tonnes
         self.storage_capacity_tonnes = None if cap_t is None else float(cap_t)
         self.fos = float(cfg.get("fos", 1.1))
-        self.P0_bar = cfg.get("P0_bar", 15)
+        self.p_in_bar = cfg.get("p_in_bar", 15)
         self.energy_cost = cfg.get("energy_cost", 0.25) # €/kWh
         self.pout_bar = cfg.get("pout_bar", defaults["pressure_bar"])
 
@@ -209,7 +213,7 @@ class HydrogenStorage:
         self.starting_storage_option = cfg.get("starting_storage_option", "Full storage")
         self.starting_storage_hours = float(cfg.get("starting_storage_hours", 0.0))
 
-        self.sec_compressor = cfg.get("storage_com_sec", self.calc_sec_boost(self.pout_bar))
+        self.sec_compressor = cfg.get("sec_compressor", self.calc_sec_boost(self.pout_bar))
      
 
         # Rate limits (default infinite if not provided)
