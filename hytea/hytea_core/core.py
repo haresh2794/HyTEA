@@ -5,11 +5,12 @@ from hytea.hytea_components.rese.rese_model import RenewableElectricity
 from hytea.hytea_components.grid.grid_model import Grid
 from hytea.hytea_components.electrolyser.electrolyser_model import ALKElectrolyser
 from hytea.hytea_components.storage.storage import HydrogenStorage
+from hytea.hytea_components.transport.truck_transport import HydrogenTruckTransport
 
 
 class HyTEACore:
     """
-    HyTEA Core - Version 4
+    HyTEA Core - Version 5
 
     Responsibilities:
     - run multiple RESE sources
@@ -21,13 +22,14 @@ class HyTEACore:
     - build final stream-wise power DataFrame in kW
     - run Electrolyser with RESE + optional Grid stream
     - configure and run Storage using electrolyser outputs
+    - configure and run Transport using storage/electrolyser outputs
 
     Current scope:
     - RESE
     - optional Grid
     - Electrolyser
     - Storage
-    - no transport
+    - Truck transport
     - no finance
     """
 
@@ -47,6 +49,9 @@ class HyTEACore:
 
         self.storage_model = None
         self.storage_results = {}
+
+        self.transport_model = None
+        self.transport_results = {}
 
         self.power_df = None
         self.grid_stream_kW = None
@@ -74,12 +79,12 @@ class HyTEACore:
             raise ValueError("grid config is required when integrate_grid=True.")
 
         if "storage" not in self.config:
-            raise ValueError("config must contain 'storage' for Version 4.")
+            raise ValueError("config must contain 'storage' for this version.")
+
+        if "transport" not in self.config:
+            raise ValueError("config must contain 'transport' for this version.")
 
     def run_rese_sources(self):
-        """
-        Run all configured RESE sources and preserve source labels.
-        """
         self.rese_models = {}
         self.rese_results = {}
 
@@ -98,12 +103,6 @@ class HyTEACore:
         return self.rese_results
 
     def aggregate_rese_results(self):
-        """
-        Aggregate all RESE source outputs into combined system-level outputs.
-
-        Stream-wise avg_capacity_factor is preserved in rese_results.
-        At this stage, no combined avg capacity factor is calculated.
-        """
         if not self.rese_results:
             self.aggregated_results = {}
             return self.aggregated_results
@@ -138,15 +137,6 @@ class HyTEACore:
         return self.aggregated_results
 
     def build_hourly_cf_mul(self):
-        """
-        Build hourly_cf_mul for Grid from the loaded RESE source CF arrays.
-
-        IMPORTANT:
-        The current Grid.weighted_res_e_cf() implementation expects shape:
-            (n_sources, 8760)
-        not:
-            (8760, n_sources)
-        """
         if not self.rese_models:
             return None
 
@@ -164,9 +154,6 @@ class HyTEACore:
         return np.vstack(cf_arrays)
 
     def run_grid(self):
-        """
-        Run Grid only if grid is integrated.
-        """
         if not self.config.get("integrate_grid", False):
             self.grid_model = None
             self.grid_results = {}
@@ -184,33 +171,20 @@ class HyTEACore:
         self.grid_results = self.grid_model.evaluate()
 
         self.grid_summary = {
-            "hourly_weighted_cf": self.grid_results["hourly_weighted_cf"],
-            "hourly_price_trend": self.grid_results["hourly_price_trend"],
-            "hourly_purchase_price_trend": self.grid_results["hourly_purchase_price_trend"],
-            "hourly_sales_price_trend": self.grid_results["hourly_sales_price_trend"],
-            "hourly_ghg_trend": self.grid_results["hourly_ghg_trend"],
             "avg_weighted_cf": float(np.mean(self.grid_results["hourly_weighted_cf"])),
             "avg_purchase_price": float(np.mean(self.grid_results["hourly_purchase_price_trend"])),
             "avg_sales_price": float(np.mean(self.grid_results["hourly_sales_price_trend"])),
             "avg_ghg_intensity": float(np.mean(self.grid_results["hourly_ghg_trend"])),
-            "avg_price_trend": float(np.mean(self.grid_results["avg_price_trend"])),
         }
 
         return self.grid_results
 
     def setup_electrolyser(self):
-        """
-        Configure the electrolyser once so the core can access
-        the actual required input capacity before building the grid stream.
-        """
         self.electrolyser_model = ALKElectrolyser()
         self.electrolyser_model.configure(config=self.config.get("electrolyser", {}))
         return self.electrolyser_model
 
     def build_rese_power_df(self):
-        """
-        Build stream-wise RESE power DataFrame in kW.
-        """
         stream_power = {}
 
         for source_name, result in self.rese_results.items():
@@ -223,15 +197,6 @@ class HyTEACore:
         return pd.DataFrame(stream_power)
 
     def build_grid_stream(self, rese_power_df):
-        """
-        Build hourly grid stream in kW as residual power required to meet
-        the electrolyser actual input capacity.
-
-        At this stage:
-        - if integrate_grid is False, returns zeros
-        - if integrate_grid is True, grid fills only the residual
-        - price and GHG caps are not yet applied
-        """
         hours = len(rese_power_df)
 
         if not self.config.get("integrate_grid", False):
@@ -271,38 +236,25 @@ class HyTEACore:
         return self.electrolyser_results
 
     def build_storage_config(self):
-        """
-        Build storage config by combining user-provided storage inputs
-        with internally available upstream electrolyser outputs.
-        """
         if not self.electrolyser_results:
             raise ValueError("Electrolyser results must exist before building storage config.")
 
         storage_config = dict(self.config.get("storage", {}))
 
-        # Inject hourly H2 production if not already provided
         if "hourly_production_kgph" not in storage_config:
             storage_config["hourly_production_kgph"] = np.asarray(
                 self.electrolyser_results["hourly"]["H2_kg"], dtype=float
             )
 
-        # Inject electrolyser capacity if not already provided
         if "electro_capacity" not in storage_config:
             storage_config["electro_capacity"] = self.electrolyser_model.electro_capacity
 
-        # Inject average SEC if not already provided
         if "avg_sec_electrolyser" not in storage_config:
             storage_config["avg_sec_electrolyser"] = self.electrolyser_model.avg_sec_electrolyser
 
         return storage_config
 
     def run_storage(self):
-        """
-        Run storage using:
-        - user-provided storage config
-        - hourly electrolyser H2 production
-        - internally available electrolyser parameters
-        """
         storage_config = self.build_storage_config()
 
         self.storage_model = HydrogenStorage()
@@ -310,6 +262,57 @@ class HyTEACore:
         self.storage_results = self.storage_model.hourly_analysis()
 
         return self.storage_results
+
+    def build_transport_config(self):
+        """
+        Build transport config by combining user-provided transport inputs
+        with internally available upstream values.
+        """
+        transport_config = dict(self.config.get("transport", {}))
+
+        # Inject P0 from electrolyser outlet pressure if not provided
+        if "P0_bar" not in transport_config:
+            transport_config["P0_bar"] = self.electrolyser_model.outlet_pressure
+
+        # Inject P1 from storage pressure if not provided
+        if "P1_bar" not in transport_config:
+            transport_config["P1_bar"] = self.storage_model.pout_bar
+
+        # Inject Q2 from upstream hourly hydrogen flow if not provided
+        if "Q2_kgph" not in transport_config:
+            if self.storage_results:
+                supply_tph = np.asarray(self.storage_results["supply_tph"], dtype=float)
+                transport_config["Q2_kgph"] = float(np.mean(supply_tph * 1000.0))
+            else:
+                hourly_h2_kg = np.asarray(self.electrolyser_results["hourly"]["H2_kg"], dtype=float)
+                transport_config["Q2_kgph"] = float(np.mean(hourly_h2_kg))
+
+        # Inject Q1 if not provided
+        if "Q1_kgph" not in transport_config:
+            if self.storage_results:
+                prod_kgph = np.asarray(self.storage_results["hourly_production_kgph"], dtype=float)
+                transport_config["Q1_kgph"] = float(np.max(prod_kgph))
+            else:
+                hourly_h2_kg = np.asarray(self.electrolyser_results["hourly"]["H2_kg"], dtype=float)
+                transport_config["Q1_kgph"] = float(np.max(hourly_h2_kg))
+
+        return transport_config
+
+    def run_transport(self):
+        """
+        Run truck transport using:
+        - user-provided transport config
+        - electrolyser outlet pressure
+        - storage pressure
+        - upstream hydrogen flow
+        """
+        transport_config = self.build_transport_config()
+
+        self.transport_model = HydrogenTruckTransport()
+        self.transport_model.configure(config=transport_config)
+        self.transport_results = self.transport_model.evaluate()
+
+        return self.transport_results
 
     def evaluate(self):
         self.validate_config()
@@ -319,6 +322,7 @@ class HyTEACore:
         self.setup_electrolyser()
         self.run_electrolyser()
         self.run_storage()
+        self.run_transport()
 
         return {
             "scenario_name": self.config.get("scenario_name"),
@@ -330,4 +334,5 @@ class HyTEACore:
             "grid_stream_kW": self.grid_stream_kW,
             "electrolyser_results": self.electrolyser_results,
             "storage_results": self.storage_results,
+            "transport_results": self.transport_results,
         }
