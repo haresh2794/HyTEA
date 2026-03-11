@@ -267,7 +267,7 @@ class HydrogenStorage:
         prod_tph = prod_kgph / 1000.0
         cumulative_production_t = np.cumsum(prod_tph)
 
-        self.required_initial_storage_kg = max(0.0, -float(np.min(cumulative_additions_kg))) * fos
+        self.required_initial_storage_kg = -float(np.min(cumulative_additions_kg)) * fos
 
         ideal_storage_curve_kg = self.required_initial_storage_kg + cumulative_additions_kg
         self.required_capacity_kg = float(np.max(ideal_storage_curve_kg))
