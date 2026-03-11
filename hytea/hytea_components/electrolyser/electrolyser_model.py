@@ -89,7 +89,11 @@ class ALKElectrolyser:
         return 4  # MW
 
     def _default_spec_capex(self):
-        return 740 #€/kW
+
+        x =886.8145256
+        y = -0.164384223
+
+        return x*self.electro_capacity**y #€/kW
     
     def _default_opex_per(self):
         return 0.03 #fraction of capex

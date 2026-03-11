@@ -272,7 +272,7 @@ class HydrogenStorage:
         ideal_storage_curve_kg = self.required_initial_storage_kg + cumulative_additions_kg
         self.required_capacity_kg = float(np.max(ideal_storage_curve_kg))
 
-        # ---------- Capacity selection ----------
+        # ---------- Capacimiytty selection ----------
         opt = str(self.storage_sizing_option).strip().lower()
 
         if opt in ["full storage", "full", "auto"]:
