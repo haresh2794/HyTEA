@@ -466,7 +466,8 @@ class ALKElectrolyser:
             "capacity_factor": energy_used_kWh.sum() / (actual_capacity_kW * hours),
             "capex":capex,
             "opex":opex,
-            "outlet_pressure": self.outlet_pressure
+            "outlet_pressure": self.outlet_pressure,
+            "electrolyser_spec_capex": self.spec_capex
         }
     
         # ======================
