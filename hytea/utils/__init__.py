@@ -1,0 +1,1 @@
+from .renewable_ninja import generate_wind_cf_from_location
