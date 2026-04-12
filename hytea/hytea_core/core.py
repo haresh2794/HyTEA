@@ -475,11 +475,13 @@ class HyTEACore:
 
         return self.transport_results
     
-    #======================================================
+    #==============================================================================================================================================================
     # ECONOMICS  
-    #======================================================
+    #===============================================================================================================================================================
+
+    # Get annual h2 delivered
     
-    def _get_annual_h2_for_economics(self):
+    def _get_annual_h2_delivered_basis(self):
         """
         Get annual hydrogen denominator for discounting and LCOH.
 
@@ -505,6 +507,25 @@ class HyTEACore:
             return float(self.electrolyser_results["totals"].get("H2_kg", 0.0))
 
         return 0.0
+    
+    
+    # Get annual h2 produced
+
+    def _get_annual_h2_for_lcoh(self):
+            """
+            Get annual hydrogen denominator for LCOH.
+            Uses only hydrogen produced by the electrolyser during the modeled period.
+            This avoids counting pre-existing stored hydrogen unless its cost is also included.
+            """
+            if self.electrolyser_results:
+                return float(self.electrolyser_results.get("totals", {}).get("H2_kg", 0.0))
+            
+            return 0.0
+    
+    # ==========================
+    # Cost breakdown
+    # =========================
+
 
     def build_cost_breakdown(self):
         """
@@ -529,19 +550,26 @@ class HyTEACore:
         """
         economics_cfg = self.config.get("economics", {})
 
-        # ---------------- RESE ----------------
+
+        # -------------------------------------------- RESE --------------------------------------------
         rese_capex = 0.0
         rese_opex = 0.0
         for _, rese_result in self.rese_results.items():
             rese_capex += float(rese_result.get("capex", 0.0))
             rese_opex += float(rese_result.get("opex", 0.0))
 
-        # ---------------- Electrolyser ----------------
+
+
+
+        # -------------------------------------------- Electrolyser --------------------------------------------
         elec_totals = self.electrolyser_results.get("totals", {})
         electrolyser_base_capex = float(elec_totals.get("capex", 0.0))
         electrolyser_opex = float(elec_totals.get("opex", 0.0))
 
-        # ---------------- Storage split ----------------
+
+
+
+        # -------------------------------------------- Storage split --------------------------------------------
         storage_total_capex = float(self.storage_results.get("total_storage_capex", 0.0))
         storage_total_opex = float(self.storage_results.get("total_storage_opex", 0.0))
         compressor_liquefier_capex = float(self.storage_results.get("total_compressor_capex", 0.0))
@@ -573,7 +601,11 @@ class HyTEACore:
         # storage opex excluding compressor/liquefier opex
         storage_opex = max(storage_total_opex - compressor_liquefier_opex, 0.0)
 
-        # ---------------- Transport ----------------
+
+
+
+        # -------------------------------------------- Transport --------------------------------------------
+
         transport_capex = float(self.transport_results.get("truck_fleet_capex", 0.0))
         transport_opex = float(self.transport_results.get("truck_fleet_opex", 0.0))
 
@@ -605,6 +637,8 @@ class HyTEACore:
             + installed_xy_cost
         )
 
+
+
         # ---------------- Totals ----------------
         total_capex = (
             rese_capex
@@ -621,7 +655,7 @@ class HyTEACore:
             + transport_opex
         )
 
-        annual_h2_kg = self._get_annual_h2_for_economics()
+        annual_h2_kg = self._get_annual_h2_for_lcoh() #Get annual h2 produced else if the delivered is required use _get_annual_h2_delivered_basis()
 
         breakdown = {
             "capex": {
@@ -656,6 +690,10 @@ class HyTEACore:
 
         self.economics_results = breakdown
         return breakdown
+    
+
+
+
 
     def _discount_single_cost_item(self, initial_value=0.0, annual_value=0.0):
         """
@@ -674,6 +712,11 @@ class HyTEACore:
             "decommissioning_fraction": economics_cfg.get("decommissioning_fraction", 0.0),
         })
         return model.evaluate()
+    
+
+
+
+
 
     def _discount_hydrogen(self, annual_h2_kg):
         """
@@ -693,6 +736,13 @@ class HyTEACore:
             "decommissioning_fraction": 0.0,
         })
         return model.evaluate()
+    
+
+
+
+    #======================================================
+    # Run Economics
+    #======================================================
 
     def run_economics(self):
         """
@@ -704,12 +754,14 @@ class HyTEACore:
         opex_items = breakdown["opex"]
         annual_h2_kg = breakdown["totals"]["annual_h2_kg"]
 
+
         # ---------------- Discount hydrogen ----------------
         h2_discounting = self._discount_hydrogen(annual_h2_kg)
         discounted_h2 = float(h2_discounting["total_present_value"])
 
         if discounted_h2 <= 0:
             raise ValueError("Discounted hydrogen must be greater than zero for LCOH calculation.")
+        
 
         # ---------------- Discount CAPEX items ----------------
         discounted_capex = {}
@@ -719,6 +771,7 @@ class HyTEACore:
                 annual_value=0.0
             )
 
+
         # ---------------- Discount OPEX items ----------------
         discounted_opex = {}
         for name, value in opex_items.items():
@@ -726,6 +779,7 @@ class HyTEACore:
                 initial_value=0.0,
                 annual_value=value
             )
+
 
         # ---------------- Total discounted cost ----------------
         total_discounted_capex = sum(
@@ -736,6 +790,7 @@ class HyTEACore:
         )
         total_discounted_cost = total_discounted_capex + total_discounted_opex
 
+
         # ---------------- Total LCOH ----------------
         total_lcoh_model = LevelizedCostModel()
         total_lcoh_model.configure({
@@ -744,12 +799,15 @@ class HyTEACore:
         })
         total_lcoh_results = total_lcoh_model.evaluate()
 
+
+
         # ---------------- Individual LCOH ----------------
         individual_lcoh = {
             "capex": {},
             "opex": {},
             "combined": {}
         }
+
 
         # CAPEX LCOH
         for name, res in discounted_capex.items():
@@ -760,6 +818,7 @@ class HyTEACore:
             })
             individual_lcoh["capex"][name] = lc_model.evaluate()["levelized_cost"]
 
+
         # OPEX LCOH
         for name, res in discounted_opex.items():
             lc_model = LevelizedCostModel()
@@ -768,6 +827,7 @@ class HyTEACore:
                 "discounted_denominator_total": discounted_h2,
             })
             individual_lcoh["opex"][name] = lc_model.evaluate()["levelized_cost"]
+
 
         # Combined CAPEX + OPEX by component
         combined_components = ["rese", "storage", "transport"]
@@ -782,6 +842,7 @@ class HyTEACore:
                 "discounted_denominator_total": discounted_h2,
             })
             individual_lcoh["combined"][name] = lc_model.evaluate()["levelized_cost"]
+
 
         # Combined block for electrolyser + compressor/liquefier
         block_capex = float(
@@ -820,6 +881,16 @@ class HyTEACore:
             "levelized_cost_results": self.levelized_cost_results,
         }
     
+
+
+
+
+    # ====================================================================
+    # CHECK for H2 Balance
+    # ====================================================================
+
+
+
     def check_annual_h2_balance(self):
         """
         Check whether annual hydrogen production/supply is sufficient
