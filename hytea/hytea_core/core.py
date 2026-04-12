@@ -6,8 +6,8 @@ from hytea.hytea_components.grid.grid_model import Grid
 from hytea.hytea_components.electrolyser.electrolyser_model import ALKElectrolyser
 from hytea.hytea_components.storage.storage import HydrogenStorage
 from hytea.hytea_components.transport.truck_transport import HydrogenTruckTransport
-from hytea.hytea_components.finance.discounting import DiscountingModel
-from hytea.hytea_components.finance.lc import LevelizedCostModel
+from hytea.hytea_components.economics.discounting import DiscountingModel
+from hytea.hytea_components.economics.lc import LevelizedCostModel
 
 
 class HyTEACore:
@@ -32,10 +32,12 @@ class HyTEACore:
     - Electrolyser
     - Storage
     - Truck transport
-    - no finance
+    - Economics
     """
-
-    def __init__(self):
+    #================
+    # 1. Initialize
+    #================
+    def __init__(self): #Initiating variables
         self.config = {}
 
         self.rese_models = {}
@@ -58,44 +60,101 @@ class HyTEACore:
         self.power_df = None
         self.grid_stream_kW = None
 
-        self.finance_results = {}
+        self.economics_results = {}
         self.discounting_results = {}
         self.levelized_cost_results = {}
 
-    def configure(self, config):
+    def configure(self, config): #Configuring the inputs for submodels
         self.config = dict(config)
 
+    
+    #=============================
+    # VALIDATIONS
+    #=============================
+
     def validate_config(self):
-        if not isinstance(self.config, dict):
+        if not isinstance(self.config, dict): #if the config is not  a dictionary respond with error
             raise ValueError("config must be a dictionary.")
 
-        if "rese_sources" not in self.config:
+        if "rese_sources" not in self.config: #if rese_sources is not available it returns error
             raise ValueError("config must contain 'rese_sources'.")
 
-        if not isinstance(self.config["rese_sources"], dict):
+        if not isinstance(self.config["rese_sources"], dict): #if rese_sources not dictionary
             raise ValueError("'rese_sources' must be a dictionary of named RESE sources.")
 
-        if len(self.config["rese_sources"]) == 0:
+        if len(self.config["rese_sources"]) == 0: #if rese_sources empty
             raise ValueError("'rese_sources' cannot be empty.")
 
-        if "electrolyser" not in self.config:
+        if "electrolyser" not in self.config: #electrolyser size not configured
             raise ValueError("config must contain 'electrolyser'.")
 
-        if self.config.get("integrate_grid", False) and "grid" not in self.config:
+        if self.config.get("integrate_grid", False) and "grid" not in self.config: #if integrated is true the grid profile must be an input
             raise ValueError("grid config is required when integrate_grid=True.")
 
+        """
         if "storage" not in self.config:
             raise ValueError("config must contain 'storage' for this version.")
 
         if "transport" not in self.config:
             raise ValueError("config must contain 'transport' for this version.")
-        if "finance" not in self.config:
-            raise ValueError("config must contain 'finance' for this version.")
+        if "economics" not in self.config:
+            raise ValueError("config must contain 'economics' for this version.")
+    
+    
+        """
 
-    def run_rese_sources(self):
+    # ==================================================================================================================================================
+    # Running RESE sources model through the RESE model
+    # ===================================================================================================================================================
+    def run_rese_sources(self): 
+
+        # -------------------------------------------------------------------------
+        # Renewable electricity input (rese_sources)
+        # -------------------------------------------------------------------------
+        # This should be a dictionary where each key represents a renewable source
+        # (for example: "wind", "solar"), and the value contains the configuration
+        # for that source.
+        #
+        # Example structure:
+        #
+        # config["rese_sources"] = {
+        #     "wind": {
+        #         "csv_file": "wind_cf.csv",   # optional: time-series data (e.g. capacity factor)
+        #         "installed_capacity_mw": 100,
+        #         "capex_per_mw": 1200000,
+        #         "opex_fraction": 0.03
+        #     },
+        #     "solar": {
+        #         "csv_file": "solar_cf.csv",
+        #         "installed_capacity_mw": 50
+        #     }
+        # }
+        #
+        # Notes:
+        # - Each source is handled independently (separate model instance per source).
+        # - If provided, "csv_file" is passed separately to the model (not part of main config).
+        # - All other parameters are sent directly into the RenewableElectricity model.
+        # - This structure allows combining multiple sources (e.g. wind + solar).
+        # - Must be a dictionary (not a list), since the code loops using .items().
+        # -------------------------------------------------------------------------
+
         self.rese_models = {}
         self.rese_results = {}
 
+        #self.rese_models > stores the model object for each source
+        #self.rese_results > stores the evaluated output for each source #
+        """
+        #example
+        rese_results = {
+            "wind": {
+                "hourly_generation_kwh": pd.Series(...),   # time series
+                "annual_generation_kwh": 320_000_000,
+                "capacity_factor": 0.365,
+                "installed_capacity_mw": 100,
+                "capex": 120_000_000,
+                "opex_annual": 3_600_000
+            },
+        """
         for source_name, source_config in self.config["rese_sources"].items():
             csv_file = source_config.get("csv_file", None)
 
@@ -109,8 +168,13 @@ class HyTEACore:
             self.rese_results[source_name] = model.evaluate()
 
         return self.rese_results
+    
+    #==============================
+    # AGGREGATE RESE individual results to one
+    #===============================
 
-    def aggregate_rese_results(self):
+    def aggregate_rese_results(self): #It merges all renewable sources into one combined time series and total cost structure.
+
         if not self.rese_results:
             self.aggregated_results = {}
             return self.aggregated_results
@@ -143,8 +207,15 @@ class HyTEACore:
         }
 
         return self.aggregated_results
-
-    def build_hourly_cf_mul(self):
+    
+    #==========================================================================================================================================================================
+    # GRID
+    #==========================================================================================================================================================================
+    
+    #===============================================
+    # build_hourly_cf_mul is only used for grid, This is passed into the Grid model
+    #===============================================
+    def build_hourly_cf_mul(self): 
         if not self.rese_models:
             return None
 
@@ -160,6 +231,10 @@ class HyTEACore:
             cf_arrays.append(np.asarray(model.hourly_cf, dtype=float))
 
         return np.vstack(cf_arrays)
+
+    #==============================
+    # Running Grid Model, This will only give out price trends, purchases prices and sales prices of the grid
+    #==============================
 
     def run_grid(self):
         if not self.config.get("integrate_grid", False):
@@ -178,6 +253,8 @@ class HyTEACore:
 
         self.grid_results = self.grid_model.evaluate()
 
+        #Gives out all the grid outputs here
+
         self.grid_summary = {
             "hourly_weighted_cf": self.grid_results["hourly_weighted_cf"],
             "hourly_price_trend": self.grid_results["hourly_price_trend"],
@@ -188,10 +265,15 @@ class HyTEACore:
             "avg_purchase_price": float(np.mean(self.grid_results["hourly_purchase_price_trend"])),
             "avg_sales_price": float(np.mean(self.grid_results["hourly_sales_price_trend"])),
             "avg_ghg_intensity": float(np.mean(self.grid_results["hourly_ghg_trend"])),
-             "avg_price_trend": float(np.mean(self.grid_results["avg_price_trend"])),
+            "avg_price_trend": float(np.mean(self.grid_results["avg_price_trend"])),
         }
 
         return self.grid_results
+    
+
+    #=============================================================================================================================================================================
+    # ELECTROLYSER
+    #==============================================================================================================================================================================
 
     def setup_electrolyser(self):
         """
@@ -201,6 +283,11 @@ class HyTEACore:
         self.electrolyser_model = ALKElectrolyser()
         self.electrolyser_model.configure(config=self.config.get("electrolyser", {}))
         return self.electrolyser_model
+    
+
+    #=======================================================
+    #Build the Rese dataframe required for electrolyse input from the rese_results > hourly_output_mw, as electrolyser streamwise input power 
+    #========================================================
 
     def build_rese_power_df(self):
         """
@@ -216,6 +303,10 @@ class HyTEACore:
             raise ValueError("No RESE stream outputs available for electrolyser input.")
 
         return pd.DataFrame(stream_power)
+    
+    #============================================================================
+    #Build hourly grid stream in kW as residual power required to meet
+    #=============================================================================
 
     def build_grid_stream(self, rese_power_df):
         """
@@ -239,10 +330,16 @@ class HyTEACore:
         target_input_kW = self.electrolyser_model.get_actual_input_capacity_kW()
         non_grid_total_kW = rese_power_df.sum(axis=1).to_numpy(dtype=float)
 
+        #Point where it is built
+
         grid_power_kW = np.maximum(target_input_kW - non_grid_total_kW, 0.0)
 
         self.grid_stream_kW = grid_power_kW
         return self.grid_stream_kW
+    
+    #=======================================================================
+    # Build the entire power stream protile including grid
+    #=========================================================================
 
     def build_power_df_for_electrolyser(self):
         rese_power_df = self.build_rese_power_df()
@@ -255,6 +352,10 @@ class HyTEACore:
 
         self.power_df = power_df
         return self.power_df
+    
+    #================================================================================
+    # Run Electrolyser
+    #=================================================================================
 
     def run_electrolyser(self):
         if self.electrolyser_model is None:
@@ -265,11 +366,18 @@ class HyTEACore:
 
         return self.electrolyser_results
 
+
+
+    #=============================================================================================================================================================================================
+    # STRORAGE
+    #=============================================================================================================================================================================================
+
     def build_storage_config(self):
         """
         Build storage config by combining user-provided storage inputs
         with internally available upstream electrolyser outputs.
         """
+        #Ensure electrolyser has already run
         if not self.electrolyser_results:
             raise ValueError("Electrolyser results must exist before building storage config.")
 
@@ -287,6 +395,10 @@ class HyTEACore:
             storage_config["avg_sec_electrolyser"] = self.electrolyser_model.avg_sec_electrolyser
 
         return storage_config
+    
+    #=================================================
+    # Run Stroage
+    #=================================================
 
     def run_storage(self):
         """
@@ -302,6 +414,11 @@ class HyTEACore:
         self.storage_results = self.storage_model.hourly_analysis()
 
         return self.storage_results
+    
+
+    #============================================================================================================================================================================================
+    # TRANSPORT
+    #==============================================================================================================================================================================================
 
     def build_transport_config(self):
         """
@@ -337,6 +454,10 @@ class HyTEACore:
                 transport_config["Q1_kgph"] = float(np.max(hourly_h2_kg))
 
         return transport_config
+    
+    #=======================================
+    # Run Transport
+    #======================================
 
     def run_transport(self):
         """
@@ -354,7 +475,11 @@ class HyTEACore:
 
         return self.transport_results
     
-    def _get_annual_h2_for_finance(self):
+    #======================================================
+    # ECONOMICS  
+    #======================================================
+    
+    def _get_annual_h2_for_economics(self):
         """
         Get annual hydrogen denominator for discounting and LCOH.
 
@@ -402,7 +527,7 @@ class HyTEACore:
         IMPORTANT:
         x+y is NOT added again separately, to avoid double counting.
         """
-        finance_cfg = self.config.get("finance", {})
+        economics_cfg = self.config.get("economics", {})
 
         # ---------------- RESE ----------------
         rese_capex = 0.0
@@ -457,9 +582,9 @@ class HyTEACore:
         y = compressor_liquefier_capex
         xy = x + y
 
-        energy_management_factor = float(finance_cfg.get("energy_management_factor", 0.10))
-        interconnection_factor = float(finance_cfg.get("interconnection_factor", 0.20))
-        engineering_factor = float(finance_cfg.get("engineering_factor", 0.15))
+        energy_management_factor = float(economics_cfg.get("energy_management_factor", 0.10))
+        interconnection_factor = float(economics_cfg.get("interconnection_factor", 0.20))
+        engineering_factor = float(economics_cfg.get("engineering_factor", 0.15))
 
         electro_capacity_kw = float(self.electrolyser_model.electro_capacity) * 1000.0
 
@@ -496,7 +621,7 @@ class HyTEACore:
             + transport_opex
         )
 
-        annual_h2_kg = self._get_annual_h2_for_finance()
+        annual_h2_kg = self._get_annual_h2_for_economics()
 
         breakdown = {
             "capex": {
@@ -529,24 +654,24 @@ class HyTEACore:
             }
         }
 
-        self.finance_results = breakdown
+        self.economics_results = breakdown
         return breakdown
 
     def _discount_single_cost_item(self, initial_value=0.0, annual_value=0.0):
         """
         Discount one cost item using the generic DiscountingModel.
         """
-        finance_cfg = self.config.get("finance", {})
+        economics_cfg = self.config.get("economics", {})
 
         model = DiscountingModel()
         model.configure({
-            "discount_rate": finance_cfg.get("discount_rate", 0.06),
-            "construction_years": finance_cfg.get("construction_years", 1),
-            "project_life_years": finance_cfg.get("project_life_years", 20),
+            "discount_rate": economics_cfg.get("discount_rate", 0.06),
+            "construction_years": economics_cfg.get("construction_years", 1),
+            "project_life_years": economics_cfg.get("project_life_years", 20),
             "initial_value": float(initial_value),
             "annual_value": float(annual_value),
             "additional_values": {},
-            "decommissioning_fraction": finance_cfg.get("decommissioning_fraction", 0.0),
+            "decommissioning_fraction": economics_cfg.get("decommissioning_fraction", 0.0),
         })
         return model.evaluate()
 
@@ -555,13 +680,13 @@ class HyTEACore:
         Discount annual hydrogen denominator.
         No decommissioning is applied to hydrogen.
         """
-        finance_cfg = self.config.get("finance", {})
+        economics_cfg = self.config.get("economics", {})
 
         model = DiscountingModel()
         model.configure({
-            "discount_rate": finance_cfg.get("discount_rate", 0.06),
-            "construction_years": finance_cfg.get("construction_years", 1),
-            "project_life_years": finance_cfg.get("project_life_years", 20),
+            "discount_rate": economics_cfg.get("discount_rate", 0.06),
+            "construction_years": economics_cfg.get("construction_years", 1),
+            "project_life_years": economics_cfg.get("project_life_years", 20),
             "initial_value": 0.0,
             "annual_value": float(annual_h2_kg),
             "additional_values": {},
@@ -569,7 +694,7 @@ class HyTEACore:
         })
         return model.evaluate()
 
-    def run_finance(self):
+    def run_economics(self):
         """
         Build total and individual discounted costs, then calculate total and individual LCOH.
         """
@@ -690,7 +815,7 @@ class HyTEACore:
         }
 
         return {
-            "finance_breakdown": self.finance_results,
+            "economics_breakdown": self.economics_results,
             "discounting_results": self.discounting_results,
             "levelized_cost_results": self.levelized_cost_results,
         }
@@ -771,7 +896,7 @@ class HyTEACore:
         self.run_electrolyser()
         self.run_storage()
         self.run_transport()
-        self.run_finance()
+        self.run_economics()
         annual_balance_results = self.check_annual_h2_balance()
 
         return {
@@ -785,7 +910,7 @@ class HyTEACore:
             "electrolyser_results": self.electrolyser_results,
             "storage_results": self.storage_results,
             "transport_results": self.transport_results,
-            "finance_results": self.finance_results,
+            "economics_results": self.economics_results,
             "discounting_results": self.discounting_results,
             "levelized_cost_results": self.levelized_cost_results,
             "annual_balance_results": annual_balance_results,
