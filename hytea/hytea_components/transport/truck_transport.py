@@ -397,7 +397,7 @@ class HydrogenTruckTransport:
             capex_per_truck = self.trailer_capex
 
             # --- Tractor capex as opex per truck ---
-            tractor_capex_as_opex = self.tractor_capex / 5
+            tractor_capex_as_opex = self.tractor_capex*0.8 / 5 #0.8 for substracting the resale price
 
             # --- Fuel per truck ---
             fuel_per_truck = self.spec_fuel_kWh_per_km * self.fuel_price_per_kWh * annual_distance_per_truck_km

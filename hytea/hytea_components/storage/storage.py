@@ -349,7 +349,7 @@ class HydrogenStorage:
         with the minimum H2 stored. Initially, this was considered to be the minimum of 
         idealized storage np.min(ideal_storage_curve_kg)/1000, but it should actually be the minimum of demand or idealized 
         storage. This ensures that, as long as storage does not go below zero, the supply 
-        remains equal to the required demand. minimum_h2_stored_t = np.minimum(ideal_storage_curve_kg, demand_kgph) / 1000
+        remains equal to the required demand. minimum_h2_stored_t = np.min(np.minimum(ideal_storage_curve_kg, demand_kgph)) / 1000
         Equalizing supply and demand can be adjusted using the fos.
         """
         
