@@ -276,7 +276,7 @@ class HyTEACore:
     # ELECTROLYSER
     #==============================================================================================================================================================================
 
-    def setup_electrolyser(self):
+    def setup_electrolyser(self): #TEST 1 completed 
             """
             Configure electrolyser based on type (ALK / PEM)
             """
@@ -285,7 +285,7 @@ class HyTEACore:
             elec_type = electrolyser_config.get("type", "ALK").lower()
 
             if elec_type == "pem":
-                self.electrolyser_model = PEMElectrolyser()
+                self.electrolyser_model = PEMElectrolyser() # TEST completed 
 
             else:  # default
                 self.electrolyser_model = ALKElectrolyser()
@@ -299,7 +299,7 @@ class HyTEACore:
     #Build the Rese dataframe required for electrolyse input from the rese_results > hourly_output_mw, as electrolyser streamwise input power 
     #========================================================
 
-    def build_rese_power_df(self):
+    def build_rese_power_df(self): #TEST 2 COMPLETED 
         """
         Build stream-wise RESE power DataFrame in kW.
         """
@@ -321,14 +321,19 @@ class HyTEACore:
     def build_grid_stream(self, rese_power_df):
         """
         Build hourly grid stream in kW as residual power required to meet
-        the electrolyser actual input capacity.
+        the electrolyser actual input capacity, subject to user-defined
+        max grid price and max grid GHG intensity limits.
 
-        At this stage:
-        - if integrate_grid is False, returns zeros
-        - if integrate_grid is True, grid fills only the residual
-        - price and GHG caps are not yet applied
+        Logic:
+        - if integrate_grid is False -> all zeros
+        - if integrate_grid is True -> grid fills only the residual gap
+        - grid is only allowed in hours where:
+            purchase_price <= max_grid_price
+            ghg_intensity <= max_grid_ghg
         """
+
         hours = len(rese_power_df)
+
 
         if not self.config.get("integrate_grid", False):
             self.grid_stream_kW = np.zeros(hours)
@@ -337,14 +342,39 @@ class HyTEACore:
         if self.electrolyser_model is None:
             raise ValueError("Electrolyser must be configured before building grid stream.")
 
+        if not self.grid_results:
+            raise ValueError("Grid results are not available. Run run_grid() before build_grid_stream().")
+
+
+        grid_cfg = self.config.get("grid", {})
+        max_grid_price = float(grid_cfg.get("max_grid_price", 120.0))   # €/MWh
+        max_grid_ghg = float(grid_cfg.get("max_grid_ghg", 500.0))       # gCO2/kWh
+
         target_input_kW = self.electrolyser_model.get_actual_input_capacity_kW()
         non_grid_total_kW = rese_power_df.sum(axis=1).to_numpy(dtype=float)
 
-        #Point where it is built
 
-        grid_power_kW = np.maximum(target_input_kW - non_grid_total_kW, 0.0)
+        residual_kW = np.maximum(target_input_kW - non_grid_total_kW, 0.0)
+
+
+        hourly_price = np.asarray(
+            self.grid_results["hourly_purchase_price_trend"],
+            dtype=float
+        )
+        hourly_ghg = np.asarray(
+            self.grid_results["hourly_ghg_trend"],
+            dtype=float
+        )
+
+        if len(hourly_price) != hours or len(hourly_ghg) != hours:
+            raise ValueError("Grid time series length does not match RESE time series length.")
+
+        allowed_mask = (hourly_price <= max_grid_price) & (hourly_ghg <= max_grid_ghg)
+
+        grid_power_kW = np.where(allowed_mask, residual_kW, 0.0)
 
         self.grid_stream_kW = grid_power_kW
+
         return self.grid_stream_kW
     
     #=======================================================================
