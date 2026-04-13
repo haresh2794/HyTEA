@@ -435,7 +435,7 @@ class HydrogenStorage:
         self.storage_to_demand_tph = storage_to_demand_tph
         self.supply_tph = supply_tph
         self.storage_inflows_tph = prod_to_storage_tph
-        self.storage_outflows_tph = storage_to_demand_tph
+        self.storage_outflows_tph = -storage_to_demand_tph
 
         # Inventories (tonnes)
         self.starting_storage_t = starting_storage_t
