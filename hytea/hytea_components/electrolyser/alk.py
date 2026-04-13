@@ -496,8 +496,8 @@ class ALKElectrolyser:
                 "water_m3": water_m3,
                 "efficiency": efficiency,
                 "sec_electrolyser": sec_electrolyser,
-                "sec_compressor": self.sec_compression,
-                "sec_transport": self.sec_transport,
+                "sec_compressor": len(h2_hourly_kg)*[1]*self.sec_compression,
+                "sec_transport": len(h2_hourly_kg)*[1]*self.sec_transport,
                 "load": load
             }
         # ======================
