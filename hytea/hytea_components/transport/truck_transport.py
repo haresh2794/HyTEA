@@ -46,6 +46,8 @@ class HydrogenTruckTransport:
 
         self.truck_fleet_capex = None
         self.truck_fleet_opex = None
+        self.transportation_capex = None
+        self.transportation_opex = None
         self.truck_fleet_ghg = None
         self.truck_speed_kmh = None
 
@@ -430,8 +432,9 @@ class HydrogenTruckTransport:
             if self.transport_method == 'Compressed' and self.boost_spec_capex > 0:
                 booster_capex_total = self.boost_spec_capex * self.Q2_kgph
                 booster_opex_total = booster_capex_total * 0.2
-                truck_fleet_capex += booster_capex_total
-                truck_fleet_opex += booster_opex_total
+                transportation_capex = booster_capex_total + truck_fleet_capex
+                transportation_opex = booster_opex_total + truck_fleet_opex
+                
 
             # --- Fleet totals per category ---
             total_fuel = fuel_per_truck * number_of_trucks
@@ -472,14 +475,16 @@ class HydrogenTruckTransport:
                 "annual_distance_per_truck_km": annual_distance_per_truck_km,
                 "capex_per_truck": capex_per_truck,
                 "tractor_capex_as_opex": tractor_capex_as_opex,
-                "fuel_per_truck": fuel_per_truck,
+                "fuel_per_truck": fuel_per_truck, #ISSUE
                 "salary_per_truck": salary_per_truck,
                 "recertification_per_truck": recertification_per_truck,
-                "other_o_n_m_per_truck": other_o_n_m_per_truck,
+                "other_o_n_m_per_truck": other_o_n_m_per_truck, #ISSUE
                 "opex_per_truck": opex_per_truck,
                 "number_of_trucks": number_of_trucks,
                 "truck_fleet_capex": truck_fleet_capex,
                 "truck_fleet_opex": truck_fleet_opex,
+                "transportation_capex": transportation_capex,
+                "transportation_opex": transportation_opex,
                 "total_ghg_per_year": total_ghg_per_year,
                 "booster_capex_total": booster_capex_total,
                 "booster_opex_total": booster_opex_total,

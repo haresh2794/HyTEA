@@ -659,8 +659,8 @@ class HyTEACore:
 
         # -------------------------------------------- Transport --------------------------------------------
 
-        transport_capex = float(self.transport_results.get("truck_fleet_capex", 0.0))
-        transport_opex = float(self.transport_results.get("truck_fleet_opex", 0.0))
+        transport_capex = float(self.transport_results.get("transportation_capex", 0.0))
+        transport_opex = float(self.transport_results.get("transportation_opex", 0.0))
 
         # ---------------- Adjusted electrolyser + compressor/liquefier block ----------------
         x = electrolyser_base_capex
