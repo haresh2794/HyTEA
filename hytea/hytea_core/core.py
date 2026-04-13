@@ -426,15 +426,15 @@ class HyTEACore:
 
         storage_config = dict(self.config.get("storage", {}))
 
-        if "hourly_production_kgph" not in storage_config:
+        if "hourly_production_kgph" not in storage_config: #Inject H₂ production
             storage_config["hourly_production_kgph"] = np.asarray(
                 self.electrolyser_results["hourly"]["H2_kg"], dtype=float
             )
 
-        if "electro_capacity" not in storage_config:
+        if "electro_capacity" not in storage_config: #electrolyser capacity ,for sizing
             storage_config["electro_capacity"] = self.electrolyser_model.electro_capacity
 
-        if "avg_sec_electrolyser" not in storage_config:
+        if "avg_sec_electrolyser" not in storage_config: #electrolyser sec required for energy calculation
             storage_config["avg_sec_electrolyser"] = self.electrolyser_model.avg_sec_electrolyser
 
         return storage_config
