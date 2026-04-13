@@ -341,7 +341,7 @@ class HydrogenStorage:
 
         
         req_init_t = self.required_initial_storage_kg / 1000.0
-        minimum_h2_stored_t = np.minimum(ideal_storage_curve_kg, demand_kgph) / 1000
+        minimum_h2_stored_t = np.min(np.minimum(ideal_storage_curve_kg, demand_kgph)) / 1000
 
         """
         TEST 6 ISSUE
