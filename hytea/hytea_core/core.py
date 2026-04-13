@@ -889,15 +889,12 @@ class HyTEACore:
     # CHECK for H2 Balance
     # ====================================================================
 
-
-
     def check_annual_h2_balance(self):
         """
-        Check whether annual hydrogen production/supply is sufficient
-        to meet annual demand and return a written message.
+        Check whether annual hydrogen production is sufficient
+        to meet annual demand.
         """
 
-        # Annual demand from storage input
         annual_demand_kg = 0.0
         if self.storage_results:
             demand_kgph = np.asarray(
@@ -907,52 +904,33 @@ class HyTEACore:
             if demand_kgph.size > 0:
                 annual_demand_kg = float(np.sum(demand_kgph))
 
-        # Prefer final annual supply if available
-        annual_supply_kg = 0.0
-        if self.transport_results:
-            annual_supply_kg = float(self.transport_results.get("total_annual_h2_kg", 0.0))
-
-        if annual_supply_kg <= 0 and self.storage_results:
-            cumulative_supply_t = np.asarray(
-                self.storage_results.get("cumulative_supply_t", np.array([])),
-                dtype=float
-            )
-            if cumulative_supply_t.size > 0:
-                annual_supply_kg = float(cumulative_supply_t[-1] * 1000.0)
-
-        # Also track electrolyser production for reporting
         annual_production_kg = 0.0
         if self.electrolyser_results:
             annual_production_kg = float(
                 self.electrolyser_results.get("totals", {}).get("H2_kg", 0.0)
             )
 
-        # Decide sufficiency using final annual supply if available,
-        # otherwise fall back to annual production
-        reference_kg = annual_supply_kg if annual_supply_kg > 0 else annual_production_kg
-        surplus_deficit_kg = reference_kg - annual_demand_kg
-        is_sufficient = reference_kg >= annual_demand_kg
+        surplus_deficit_kg = annual_production_kg - annual_demand_kg
+        is_sufficient = annual_production_kg >= annual_demand_kg
 
         if is_sufficient:
             message = (
-                f"Annual hydrogen supply is sufficient. "
-                f"Available = {reference_kg:,.2f} kg/year, "
+                f"Annual hydrogen production is sufficient. "
+                f"Produced = {annual_production_kg:,.2f} kg/year, "
                 f"demand = {annual_demand_kg:,.2f} kg/year, "
                 f"surplus = {surplus_deficit_kg:,.2f} kg/year."
             )
         else:
             message = (
-                f"Annual hydrogen supply is not sufficient. "
-                f"Available = {reference_kg:,.2f} kg/year, "
+                f"Annual hydrogen production is not sufficient. "
+                f"Produced = {annual_production_kg:,.2f} kg/year, "
                 f"demand = {annual_demand_kg:,.2f} kg/year, "
                 f"deficit = {abs(surplus_deficit_kg):,.2f} kg/year."
             )
 
         return {
             "annual_production_kg": annual_production_kg,
-            "annual_supply_kg": annual_supply_kg,
             "annual_demand_kg": annual_demand_kg,
-            "reference_kg": reference_kg,
             "surplus_deficit_kg": surplus_deficit_kg,
             "is_sufficient": is_sufficient,
             "message": message,
