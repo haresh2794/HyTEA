@@ -930,6 +930,7 @@ class HyTEACore:
 
         return {
             "annual_production_kg": annual_production_kg,
+            "annual_supply_kg": annual_production_kg,
             "annual_demand_kg": annual_demand_kg,
             "surplus_deficit_kg": surplus_deficit_kg,
             "is_sufficient": is_sufficient,
