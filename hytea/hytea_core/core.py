@@ -318,7 +318,7 @@ class HyTEACore:
     #Build hourly grid stream in kW as residual power required to meet
     #=============================================================================
 
-    def build_grid_stream(self, rese_power_df):#TEST 3 COMPLETED, the peak hours in the excel is considering the time from 6-8, python considers 5-7 so it it correct
+    def build_grid_stream(self, rese_power_df):#TEST 3 COMPLETED, the peak hours in the excel is considering the time from 6-8 PM, python considers 5-7 PM so it it correct
         """
         Build hourly grid stream in kW as residual power required to meet
         the electrolyser actual input capacity, subject to user-defined
@@ -443,8 +443,18 @@ class HyTEACore:
     # Run Stroage
     #=================================================
 
-    def run_storage(self): #
+    def run_storage(self): #TEST 6 COMPLETED tested with all stroge arrays, 
+
         """
+        TEST 6 ISSUE
+        In the Excel sheet, the supply and demand do not equalize. The problem was 
+        with the minimum H2 stored. Initially, this was considered to be the minimum of 
+        idealized storage np.min(ideal_storage_curve_kg)/1000, but it should actually be the minimum of demand or idealized 
+        storage. This ensures that, as long as storage does not go below zero, the supply 
+        remains equal to the required demand. minimum_h2_stored_t = np.minimum(ideal_storage_curve_kg, demand_kgph) / 1000
+        Equalizing supply and demand can be adjusted using the fos.
+
+
         Run storage using:
         - user-provided storage config
         - hourly electrolyser H2 production

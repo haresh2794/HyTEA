@@ -341,7 +341,17 @@ class HydrogenStorage:
 
         
         req_init_t = self.required_initial_storage_kg / 1000.0
-        minimum_H2_stored_t = np.min(ideal_storage_curve_kg)/1000
+        minimum_h2_stored_t = np.minimum(ideal_storage_curve_kg, demand_kgph) / 1000
+
+        """
+        TEST 6 ISSUE
+        In the Excel sheet, the supply and demand do not equalize. The problem was 
+        with the minimum H2 stored. Initially, this was considered to be the minimum of 
+        idealized storage np.min(ideal_storage_curve_kg)/1000, but it should actually be the minimum of demand or idealized 
+        storage. This ensures that, as long as storage does not go below zero, the supply 
+        remains equal to the required demand. minimum_h2_stored_t = np.minimum(ideal_storage_curve_kg, demand_kgph) / 1000
+        Equalizing supply and demand can be adjusted using the fos.
+        """
         
 
 
@@ -394,10 +404,10 @@ class HydrogenStorage:
             
 
             # Storage -> Demand 
-            if s_start - shortfall_tph[t] > minimum_H2_stored_t:
+            if s_start - shortfall_tph[t] > minimum_h2_stored_t:
                 storage_to_demand_tph[t] = shortfall_tph[t]
             else:
-                storage_to_demand_tph[t] = min(shortfall_tph[t],s_start - minimum_H2_stored_t) #========================================================================================
+                storage_to_demand_tph[t] = min(shortfall_tph[t],s_start - minimum_h2_stored_t) #====CORRECTED after TEST 6 ====================================================================================
 
             # Supply
             supply_tph[t] = prod_to_demand_tph[t] + storage_to_demand_tph[t]
