@@ -490,6 +490,7 @@ class HydrogenTruckTransport:
                 "booster_opex_total": booster_opex_total,
                 "boost_spec_capex": self.boost_spec_capex ,
                 "booster_spec_elec_consumption": self.sec_boost_kWh_per_kg,
+                "P2_bar": self.P2_bar,
                 "total_fuel": total_fuel,
                 "total_salary": total_salary,
                 "total_recertification": total_recertification,
