@@ -318,7 +318,7 @@ class HyTEACore:
     #Build hourly grid stream in kW as residual power required to meet
     #=============================================================================
 
-    def build_grid_stream(self, rese_power_df):
+    def build_grid_stream(self, rese_power_df):#TEST 3 COMPLETED, the peak hours in the excel is considering the time from 6-8, python considers 5-7 so it it correct
         """
         Build hourly grid stream in kW as residual power required to meet
         the electrolyser actual input capacity, subject to user-defined
@@ -400,7 +400,7 @@ class HyTEACore:
     # Run Electrolyser
     #=================================================================================
 
-    def run_electrolyser(self):
+    def run_electrolyser(self): #TEST 5 Completed, #TEST 5.1 completed electrolyser_efficiency()
         if self.electrolyser_model is None:
             self.setup_electrolyser()
 

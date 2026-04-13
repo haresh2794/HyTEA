@@ -20,7 +20,7 @@ class ALKElectrolyser:
         self.efficiency = None
         self.annual_improvement = None
         self.install_year = None
-        self.size_factors = {
+        self.scale_multiplier = {
             1: 0.908995449,
             5: 0.999894994,
             20: 1.020301014,
@@ -276,13 +276,13 @@ class ALKElectrolyser:
 
     def _nearest_size(self, size_mw):
         """Pick nearest available electrolyser size (MW)"""
-        return min(self.size_factors.keys(), key=lambda x: abs(x - size_mw))
+        return min(self.scale_multiplier.keys(), key=lambda x: abs(x - size_mw))
     
-    def electrolyser_efficiency(self, load_pct, size_mw, install_year):
+    def electrolyser_efficiency(self, load_pct, size_mw, install_year): #TEST 5.1 completed
         """Vectorised efficiency (fraction) for percentage load"""
         load = np.asarray(load_pct)
         nearest_size = self._nearest_size(size_mw)
-        factor = self.size_factors[nearest_size]
+        factor = self.scale_multiplier[nearest_size]
         improvement_term = self.annual_improvement ** (install_year - 2020)
 
         eff = np.zeros_like(load, dtype=float)
