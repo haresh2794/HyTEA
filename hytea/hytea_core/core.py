@@ -322,7 +322,7 @@ class HyTEACore:
         """
         Build hourly grid stream in kW as residual power required to meet
         the electrolyser actual input capacity, subject to user-defined
-        max grid price and max grid GHG intensity limits.
+        max grid price, max grid GHG intensity, and optional peak-hour blocking.
 
         Logic:
         - if integrate_grid is False -> all zeros
@@ -330,10 +330,10 @@ class HyTEACore:
         - grid is only allowed in hours where:
             purchase_price <= max_grid_price
             ghg_intensity <= max_grid_ghg
+        - if use_grid_during_peak_hours is False, grid is blocked during peak hours
         """
 
         hours = len(rese_power_df)
-
 
         if not self.config.get("integrate_grid", False):
             self.grid_stream_kW = np.zeros(hours)
@@ -345,17 +345,16 @@ class HyTEACore:
         if not self.grid_results:
             raise ValueError("Grid results are not available. Run run_grid() before build_grid_stream().")
 
-
         grid_cfg = self.config.get("grid", {})
         max_grid_price = float(grid_cfg.get("max_grid_price", 120.0))   # €/MWh
         max_grid_ghg = float(grid_cfg.get("max_grid_ghg", 500.0))       # gCO2/kWh
+        use_grid_during_peak_hours = bool(grid_cfg.get("use_grid_during_peak_hours", True))
+        peak_hours = tuple(grid_cfg.get("peak_hours", (17, 18)))
 
         target_input_kW = self.electrolyser_model.get_actual_input_capacity_kW()
         non_grid_total_kW = rese_power_df.sum(axis=1).to_numpy(dtype=float)
 
-
         residual_kW = np.maximum(target_input_kW - non_grid_total_kW, 0.0)
-
 
         hourly_price = np.asarray(
             self.grid_results["hourly_purchase_price_trend"],
@@ -371,17 +370,21 @@ class HyTEACore:
 
         allowed_mask = (hourly_price <= max_grid_price) & (hourly_ghg <= max_grid_ghg)
 
+        if not use_grid_during_peak_hours:
+            hour_of_day = np.arange(hours) % 24
+            peak_mask = np.isin(hour_of_day, peak_hours)
+            allowed_mask = allowed_mask & (~peak_mask)
+
         grid_power_kW = np.where(allowed_mask, residual_kW, 0.0)
 
         self.grid_stream_kW = grid_power_kW
-
         return self.grid_stream_kW
     
     #=======================================================================
     # Build the entire power stream protile including grid
     #=========================================================================
 
-    def build_power_df_for_electrolyser(self):
+    def build_power_df_for_electrolyser(self): #TEST 4 COMPLETED but outputs depend on get_actual_input_capacity_kW
         rese_power_df = self.build_rese_power_df()
         grid_stream_kW = self.build_grid_stream(rese_power_df)
 

@@ -14,7 +14,7 @@ class Grid:
     def __init__(self):
         # Core attributes
         self.hourly_cf_mul = None         # np.array, multiple CFs in one array
-        self.ratios = [1]                 # ratio between CFs
+        self.ratios = [0]                 # ratio between CFs
         self.avg_grid_price = 100         # €/MWh
         self.difference = 50              # €/MWh
         self.ghg_avg = 300                # gCO2/kWh
