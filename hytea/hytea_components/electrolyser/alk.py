@@ -269,7 +269,7 @@ class ALKElectrolyser:
         return {key: value for key, (value, _) in defaults_with_units.items()}
 
     def h2_from_energy_kWh(self, energy_kWh,sec_electrolyser):
-        total_sec = sec_electrolyser + self.sec_compression+self.sec_transport
+        total_sec = sec_electrolyser + self.sec_compression + self.sec_transport
         return energy_kWh / total_sec
 
 

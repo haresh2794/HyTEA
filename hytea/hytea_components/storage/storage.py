@@ -341,6 +341,7 @@ class HydrogenStorage:
 
         
         req_init_t = self.required_initial_storage_kg / 1000.0
+        minimum_H2_stored_t = np.min(ideal_storage_curve_kg)/1000
         
 
 
@@ -362,6 +363,7 @@ class HydrogenStorage:
         supply_tph = np.zeros(n)
 
         boil_off_t = np.zeros(n)
+        
 
         # ---------- Starting storage t=0  ----------
         start_opt = str(self.starting_storage_option).strip().lower()
@@ -389,11 +391,13 @@ class HydrogenStorage:
             # Demand shortfall
             shortfall_tph[t] = max(0.0, d - prod_to_demand_tph[t])
 
+            
+
             # Storage -> Demand 
-            if s_start - shortfall_tph[t] > req_init_t/self.fos:
+            if s_start - shortfall_tph[t] > minimum_H2_stored_t:
                 storage_to_demand_tph[t] = shortfall_tph[t]
             else:
-                storage_to_demand_tph[t] = min(shortfall_tph[t],s_start - req_init_t/self.fos)
+                storage_to_demand_tph[t] = min(shortfall_tph[t],s_start - minimum_H2_stored_t) #========================================================================================
 
             # Supply
             supply_tph[t] = prod_to_demand_tph[t] + storage_to_demand_tph[t]
