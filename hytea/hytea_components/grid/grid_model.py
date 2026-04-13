@@ -161,7 +161,6 @@ class Grid:
         return (ghg_trend / self.avg_ghg_trend) * self.ghg_avg
 
 
-
     def evaluate(self):
         """Run all core methods, store results as attributes, and return dictionary."""
         

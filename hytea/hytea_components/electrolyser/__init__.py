@@ -1,3 +1,4 @@
 # init
 #Alkaline electrolyser
-from .electrolyser_model import ALKElectrolyser
+from .alk import ALKElectrolyser
+from .pem import PEMElectrolyser

@@ -3,7 +3,8 @@ import pandas as pd
 
 from hytea.hytea_components.rese.rese_model import RenewableElectricity
 from hytea.hytea_components.grid.grid_model import Grid
-from hytea.hytea_components.electrolyser.electrolyser_model import ALKElectrolyser
+from hytea.hytea_components.electrolyser.alk import ALKElectrolyser
+from hytea.hytea_components.electrolyser.pem import PEMElectrolyser
 from hytea.hytea_components.storage.storage import HydrogenStorage
 from hytea.hytea_components.transport.truck_transport import HydrogenTruckTransport
 from hytea.hytea_components.economics.discounting import DiscountingModel
@@ -213,7 +214,7 @@ class HyTEACore:
     #==========================================================================================================================================================================
     
     #===============================================
-    # build_hourly_cf_mul is only used for grid, This is passed into the Grid model
+    # build_hourly_cf_mul is only USED for grid price estimation and intensity, This is passed into the Grid model
     #===============================================
     def build_hourly_cf_mul(self): 
         if not self.rese_models:
@@ -276,14 +277,23 @@ class HyTEACore:
     #==============================================================================================================================================================================
 
     def setup_electrolyser(self):
-        """
-        Configure the electrolyser once so the core can access
-        the actual required input capacity before building the grid stream.
-        """
-        self.electrolyser_model = ALKElectrolyser()
-        self.electrolyser_model.configure(config=self.config.get("electrolyser", {}))
-        return self.electrolyser_model
-    
+            """
+            Configure electrolyser based on type (ALK / PEM)
+            """
+
+            electrolyser_config = self.config.get("electrolyser", {})
+            elec_type = electrolyser_config.get("type", "ALK").lower()
+
+            if elec_type == "pem":
+                self.electrolyser_model = PEMElectrolyser()
+
+            else:  # default
+                self.electrolyser_model = ALKElectrolyser()
+
+            self.electrolyser_model.configure(config=electrolyser_config)
+
+            return self.electrolyser_model
+        
 
     #=======================================================
     #Build the Rese dataframe required for electrolyse input from the rese_results > hourly_output_mw, as electrolyser streamwise input power 
