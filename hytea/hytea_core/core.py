@@ -512,7 +512,7 @@ class HyTEACore:
     # Run Transport
     #======================================
 
-    def run_transport(self):
+    def run_transport(self): #TEST 7 completed with minor errors , Check boost_spec_capex
         """
         Run truck transport using:
         - user-provided transport config
@@ -689,8 +689,6 @@ class HyTEACore:
             + engineering_cost
             + installed_xy_cost
         )
-
-
 
         # ---------------- Totals ----------------
         total_capex = (

@@ -105,23 +105,25 @@ class HydrogenStorage:
         Compressor CAPEX for compression from p_in_bar to pout_bar
         """
         table = {
-            0:  (95.16475, 126.05269, -0.34019),
-            15: (68.95146, 79.23782, -0.33997),
-            30: (64.65757, 77.77250, -0.33998),
-            60: (61.065, 68.250, -0.340),
+            0:  (95.164748, 126.052692, -0.340193, -0.340175),
+            15: (68.951461, 79.237823,  -0.339972, -0.340180),
+            30: (64.657575, 77.772504,  -0.339985, -0.339835),
+            60: (61.065051, 68.250099,  -0.340003, -0.339968),
         }
 
         pin = self.p_in_bar
         Q = Q2_kgph
 
-       
 
         if pin not in table:
-            raise ValueError("p_in_bar must be one of: 0, 15, 30, 60 barg")
+            raise ValueError("P0_bar must be one of: 0, 15, 30, 60 barg")
 
-        A200, A500, B = table[pin]
+        A200, A500, B200, B500 = table[pin]
 
-        A = A200 + (pout_bar - 200) / (500 - 200) * (A500 - A200)
+        f = (pout_bar - 200) / (500 - 200)
+
+        A = A200 + f * (A500 - A200)
+        B = B200 + f * (B500 - B200)
 
         return 1000 * A * Q**B
 

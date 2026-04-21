@@ -228,28 +228,31 @@ class HydrogenTruckTransport:
 
     #------------Booster -------------
 
-    def _calc_compressor_spec_capex(self, pout_bar):
+    def _calc_compressor_spec_capex(self, pout_bar): #TEST 8 Booster spec opex fixed
         """
-        Compressor CAPEX for compression from P0_bar to pout_bar
+        Compressor specific CAPEX for compression from P0_bar to pout_bar.
+        Matches Excel logic exactly by interpolating both A and B
+        between outlet pressures of 200 and 500 barg.
         """
         table = {
-            0:  (95.16, 126.05, -0.34),
-            15: (68.95, 79.24, -0.34),
-            30: (64.66, 77.77, -0.34),
-            60: (61.07, 68.25, -0.34),
+            0:  (95.164748, 126.052692, -0.340193, -0.340175),
+            15: (68.951461, 79.237823,  -0.339972, -0.340180),
+            30: (64.657575, 77.772504,  -0.339985, -0.339835),
+            60: (61.065051, 68.250099,  -0.340003, -0.339968),
         }
 
         pin = self.P0_bar
         Q = self.Q2_kgph
 
-       
-
         if pin not in table:
             raise ValueError("P0_bar must be one of: 0, 15, 30, 60 barg")
 
-        A200, A500, B = table[pin]
+        A200, A500, B200, B500 = table[pin]
 
-        A = A200 + (pout_bar - 200) / (500 - 200) * (A500 - A200)
+        f = (pout_bar - 200) / (500 - 200)
+
+        A = A200 + f * (A500 - A200)
+        B = B200 + f * (B500 - B200)
 
         return 1000 * A * Q**B
 
@@ -431,7 +434,7 @@ class HydrogenTruckTransport:
             booster_opex_total = 0
             if self.transport_method == 'Compressed' and self.boost_spec_capex > 0:
                 booster_capex_total = self.boost_spec_capex * self.Q2_kgph
-                booster_opex_total = booster_capex_total * 0.2
+                booster_opex_total = booster_capex_total * 0.02
                 transportation_capex = booster_capex_total + truck_fleet_capex
                 transportation_opex = booster_opex_total + truck_fleet_opex
                 
@@ -488,7 +491,7 @@ class HydrogenTruckTransport:
                 "total_ghg_per_year": total_ghg_per_year,
                 "booster_capex_total": booster_capex_total,
                 "booster_opex_total": booster_opex_total,
-                "boost_spec_capex": self.boost_spec_capex ,
+                "boost_spec_capex": self.boost_spec_capex , #ISSUE
                 "booster_spec_elec_consumption": self.sec_boost_kWh_per_kg,
                 "P2_bar": self.P2_bar,
                 "total_fuel": total_fuel,
