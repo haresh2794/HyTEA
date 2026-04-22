@@ -72,6 +72,7 @@ class HydrogenTruckTransport:
         self.booster_opex_total= None
         self.turns_per_truck= None
         self.tonnes_per_truck_kg= None
+        self.number_of_fills = None
 
 
         self.tractor_cost_defaults = {
@@ -289,6 +290,8 @@ class HydrogenTruckTransport:
             self.turns_per_truck = (
                 np.sum(self.trailers_completely_filled_each_hour) / self.number_of_trucks
             )
+
+            self.number_of_fills = np.sum(self.trailers_completely_filled_each_hour)
 
             # Total annual round-trip distance per truck (km/year)
             self.annual_distance_per_truck_km = (
@@ -570,5 +573,6 @@ class HydrogenTruckTransport:
                 "total_recertification": total_recertification,
                 "total_other_o_n_m": total_other_o_n_m,
                 "total_tractor_capex_as_opex": total_tractor_capex_as_opex,
-                "total_annual_h2_transported_kg": self.total_annual_h2_transported_kg
+                "total_annual_h2_transported_kg": self.total_annual_h2_transported_kg,
+                "number_of_fills" : self.number_of_fills 
             }
