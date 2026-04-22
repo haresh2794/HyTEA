@@ -78,9 +78,9 @@ class HydrogenTruckTransport:
         self.tractor_cost_defaults = {
             'Diesel': {
                 'tractor_capex': 150000,
-                'spec_fuel_kWh_per_km': 3.2945, #kWh/km/truck
-                'fuel_price_per_kWh': 0.20, #€/kWh/truck
-                'fuel_price_per_km': 0.20*3.2945, #€/km/truck
+                'spec_fuel_kWh_per_km': 3.29450264, #kWh/km/truck
+                'fuel_price_per_kWh': 0.20033, #€/kWh/truck
+                'fuel_price_per_km': 0.20033*3.29450264, #€/km/truck
                 'fuel_ghg_g_per_kWh': 263, #gCO2/kWh/truck
                 'drivers_per_truck': 4,
                 'other_employees_per_truck': 1.1,
