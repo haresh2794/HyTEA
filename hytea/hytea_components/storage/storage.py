@@ -299,8 +299,10 @@ class HydrogenStorage:
             capacity_kg = self.required_initial_storage_kg
         
         cap_t = capacity_kg / 1000.0
+
+
       
-        # ---------- CAPEX calculation ----------
+        # ----------spec Storage CAPEX calculation ----------
         if self.custom_specific_capex is not None:
             self.storage_specific_capex = self.custom_specific_capex
 
@@ -312,6 +314,8 @@ class HydrogenStorage:
 
         
         max_hourly_prod_kgph = np.max(prod_kgph)
+
+
 
         # ---------- Compressor / Liquefaction CAPEX ----------
         if self.storage_method == "Liquid H2":
@@ -326,20 +330,34 @@ class HydrogenStorage:
         self.compressor_specific_capex = compressor_spec_capex
         self.total_compressor_capex = compressor_spec_capex * max_hourly_prod_kgph
 
+        # ----------Total Storage CAPEX calculation ----------
+
         if self.com_liq_included:
-            self.total_storage_capex = self.storage_specific_capex * capacity_kg*self.fos + self.total_compressor_capex
+            self.total_storage_capex = self.storage_specific_capex * capacity_kg*self.fos - self.total_compressor_capex
         else:
             self.total_storage_capex = self.storage_specific_capex * capacity_kg*self.fos
 
         
-        #------------OPEX calculation--------------
+        #------------Storage OPEX calculation--------------
         if self.storage_method == "Liquid H2":
 
             #calculated differently
-            self.total_storage_opex = self.total_storage_capex*0.02 + self.liq_storage_sec*self.energy_cost*sum(prod_kgph)
+            self.total_storage_opex = self.total_storage_capex*0.02 #+ self.liq_storage_sec*self.energy_cost*sum(prod_kgph)
             
         else:
-            self.total_storage_opex = self.total_storage_capex*0.02 + self.sec_compressor*self.energy_cost*sum(prod_kgph)
+            self.total_storage_opex = self.total_storage_capex*0.02 #+ self.sec_compressor*self.energy_cost*sum(prod_kgph)
+        
+        #------------Compressor OPEX calculation--------------
+
+        if self.storage_method == "Liquid H2":
+
+            #calculated differently
+            self.total_compressor_opex = self.total_compressor_capex*0.02 #+ self.liq_storage_sec*self.energy_cost*sum(prod_kgph)
+            
+        else:
+            self.total_compressor_opex = self.total_compressor_capex*0.02 #+ self.sec_compressor*self.energy_cost*sum(prod_kgph)
+
+
 
         
         req_init_t = self.required_initial_storage_kg / 1000.0
@@ -476,6 +494,7 @@ class HydrogenStorage:
             "storage_specific_capex": self.storage_specific_capex,
             "compressor_specific_capex": self.compressor_specific_capex,
             "total_compressor_capex": self.total_compressor_capex,
+            "total_compressor_opex":self.total_compressor_opex,
             "total_storage_capex": self.total_storage_capex,
             "total_storage_opex": self.total_storage_opex,
 
