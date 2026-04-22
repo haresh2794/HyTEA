@@ -575,6 +575,7 @@ class HyTEACore:
             
             return 0.0
     
+    
     # ==========================
     # Cost breakdown
     # =========================
@@ -613,13 +614,10 @@ class HyTEACore:
 
 
 
-
         # -------------------------------------------- Electrolyser --------------------------------------------
         elec_totals = self.electrolyser_results.get("totals", {})
         electrolyser_base_capex = float(elec_totals.get("capex", 0.0))
         electrolyser_opex = float(elec_totals.get("opex", 0.0))
-
-
 
 
         # -------------------------------------------- Storage split --------------------------------------------
@@ -653,9 +651,6 @@ class HyTEACore:
 
         # storage opex excluding compressor/liquefier opex
         storage_opex = max(storage_total_opex - compressor_liquefier_opex, 0.0)
-
-
-
 
         # -------------------------------------------- Transport --------------------------------------------
 

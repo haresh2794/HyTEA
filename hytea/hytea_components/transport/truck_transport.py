@@ -145,9 +145,9 @@ class HydrogenTruckTransport:
     # ---------------- Default Methods ----------------
     def _default_truck_type(self): return 'Diesel'
     def _default_transport_method(self): return 'Compressed'
-    def _default_P0_bar(self): return 15
-    def _default_P1_bar(self): return 300
-    def _default_P2_bar(self): return 350
+    def _default_P0_bar(self): return 15 #Electrolyser output pressure - ALK
+    def _default_P1_bar(self): return 300 #Storage pressure
+    def _default_P2_bar(self): return 350 #Transport pressure
     def _default_Q1_kgph(self): return 72.29
     def _default_Q2_kgph(self): return 54.17
     def _default_distance_km(self): return 100
@@ -160,36 +160,109 @@ class HydrogenTruckTransport:
     # ---------------- Derived Calculations ----------------
 
     # ---------------- Minimum Fleet Calculation ----------------
-    def _calc_min_trailers(self):
+    def _calc_min_trailers(self, hourly_massflow_kgph=None): #TEST 9 MINIMUM trailers
         """
-        Calculates minimum number of trailers required for steady-state supply chain.
-        Updates self.number_of_trucks.
+        Hourly trailer fleet calculation with carry-over filling logic.
 
+        Logic:
+        - mass entering trailer filling each hour =
+        current hour massflow + previous hour carryover
+        - trailers needed each hour = mass entering fill / trailer_load_kg
+        - trailers completely filled each hour = floor(trailers needed)
+        - trailers being filled each hour = ceil(trailers needed), but 0 if no mass
+        - mass to add to next hour fill =
+        (trailers needed - trailers completely filled) * trailer_load_kg
+        - trailers in transit each hour =
+        sum of completely filled trailers dispatched over the previous
+        total_transit_time hours
+        - total trailers needed each hour =
+        trailers in transit + trailers being filled
+        - minimum trailer fleet = max(total trailers needed each hour)
         """
 
         if self.trailer_load_kg is None or self.trailer_load_kg <= 0:
-            raise ValueError("trailer_load_kg must be set and >0 before calculating fleet")
+            raise ValueError("trailer_load_kg must be set and > 0 before calculating fleet")
 
-        if self.Q2_kgph is None or self.trailer_load_kg is None:
-            raise ValueError("Q2_kgph (supply) and trailer_load_kg must be set before calculating fleet")
+        if self.truck_speed_kmh is None or self.truck_speed_kmh <= 0:
+            raise ValueError("truck_speed_kmh must be set and > 0 before calculating fleet")
 
-        # Calculate total transit time (hours)
+        # If hourly profile is not provided, fall back to constant profile from Q2_kgph
+        if hourly_massflow_kgph is None:
+            if self.Q2_kgph is None:
+                raise ValueError("Either hourly_massflow_kgph or Q2_kgph must be provided")
+            hourly_massflow_kgph = np.full(8760, float(self.Q2_kgph), dtype=float)
+        else:
+            hourly_massflow_kgph = np.asarray(hourly_massflow_kgph, dtype=float)
+
+        if np.any(hourly_massflow_kgph < 0):
+            raise ValueError("hourly_massflow_kgph must not contain negative values")
+
+        # Transit time in hours
         time_to_user = self.distance_km / self.truck_speed_kmh
         time_to_return = self.distance_km / self.truck_speed_kmh
-        total_transit_time = time_to_user + self.trailer_fill_time_h + time_to_return + 1  # +1h idling at origin
-        transit_steps = max(1, round(total_transit_time))
+        total_transit_time = time_to_user + self.trailer_fill_time_h + time_to_return + 1.0
+        transit_steps = max(1, int(math.floor(total_transit_time)))
 
-        # Trailers in transit
-        trailers_in_transit = (self.Q2_kgph * transit_steps) / self.trailer_load_kg  
+        n = len(hourly_massflow_kgph)
 
-        # Trailers being filled per hour (partial counts as 1)
-        trailers_being_filled = math.ceil(self.Q2_kgph / self.trailer_load_kg)
+        mass_into_fill_kg = np.zeros(n)
+        trailers_needed = np.zeros(n)
+        trailers_completely_filled = np.zeros(n, dtype=int)
+        trailers_being_filled = np.zeros(n, dtype=int)
+        mass_to_next_hour_kg = np.zeros(n)
+        trailers_in_transit = np.zeros(n, dtype=int)
+        total_trailers_needed = np.zeros(n, dtype=int)
 
-        # Total minimum fleet
-        self.number_of_trucks = math.ceil(trailers_in_transit + trailers_being_filled)
+        carryover_kg = 0.0
+
+        for t in range(n):
+            # Current fill mass = current hour flow + leftover from previous hour
+            mass_into_fill_kg[t] = hourly_massflow_kgph[t] + carryover_kg
+
+            # Equivalent trailers required this hour
+            trailers_needed[t] = mass_into_fill_kg[t] / self.trailer_load_kg
+
+            # Fully completed trailers this hour
+            trailers_completely_filled[t] = int(np.floor(trailers_needed[t]))
+
+            # Any ongoing filling this hour?
+            if mass_into_fill_kg[t] > 0:
+                trailers_being_filled[t] = int(np.ceil(trailers_needed[t]))
+            else:
+                trailers_being_filled[t] = 0
+
+            # Leftover mass for next hour
+            mass_to_next_hour_kg[t] = (
+                trailers_needed[t] - trailers_completely_filled[t]
+            ) * self.trailer_load_kg
+
+            carryover_kg = mass_to_next_hour_kg[t]
+
+            # Trailers in transit this hour:
+            # first hour = 0, then sum of fully filled trailers over previous transit window
+            start_idx = max(0, t - transit_steps)
+            trailers_in_transit[t] = int(
+                np.sum(trailers_completely_filled[start_idx:t])
+            )
+
+            # Total trailers needed this hour
+            total_trailers_needed[t] = (
+                trailers_in_transit[t] + trailers_being_filled[t]
+            )
+
+        self.number_of_trucks = int(np.max(total_trailers_needed))
+
+        # Optional: store hourly arrays for reporting/debugging
+        self.mass_into_fill_kg = mass_into_fill_kg
+        self.trailers_needed_each_hour = trailers_needed
+        self.trailers_completely_filled_each_hour = trailers_completely_filled
+        self.trailers_being_filled_each_hour = trailers_being_filled
+        self.mass_to_next_hour_fill_kg = mass_to_next_hour_kg
+        self.trailers_in_transit_each_hour = trailers_in_transit
+        self.total_trailers_needed_each_hour = total_trailers_needed
+        self.total_transit_time_h = total_transit_time
 
         return self.number_of_trucks
-
 
     def _calc_annual_truck_metrics(self):
           """
@@ -345,7 +418,7 @@ class HydrogenTruckTransport:
             trailer_table = trailer_defaults['pressure_load_capex']
 
             pressures = np.array(list(trailer_table.keys()))
-            nearest_p = pressures[np.abs(pressures - self.P2_bar).argmin()]
+            nearest_p = pressures[np.abs(pressures - self.P2_bar).argmin()] #If user input tranport pressure is 370 then load of the trailer and the capex will be for 350 bar, CHANGE TO POLYNOMIAL after TESTING
 
             self.trailer_load_kg, self.trailer_capex = trailer_table[nearest_p]
 
@@ -371,7 +444,7 @@ class HydrogenTruckTransport:
             self.trailer_fill_time_h = cfg.get('trailer_fill_time_h', trailer_defaults['trailer_fill_time_h'])
 
             self.trailer_capex = trailer_defaults['base_capex']
-            self.trailer_load_kg = 4600
+            self.trailer_load_kg = cfg.get('trailer_load_kg', 4600)
 
             # No booster for liquid
             self.boost_spec_capex = 0
