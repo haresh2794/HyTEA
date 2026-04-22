@@ -51,7 +51,7 @@ class HydrogenTruckTransport:
         self.truck_fleet_ghg = None
         self.truck_speed_kmh = None
 
-        self.total_annual_h2_kg = None
+        self.total_annual_h2_transported_kg = None
         self.tonnes_per_truck_kg = None
         self.turns_per_truck = None
         self.annual_distance_per_truck_km = None
@@ -263,40 +263,37 @@ class HydrogenTruckTransport:
         self.total_transit_time_h = total_transit_time
 
         return self.number_of_trucks
+    
 
     def _calc_annual_truck_metrics(self):
-          """
-          Calculates annual transport metrics per truck based on steady-state flow.
-          
-          Returns:
-              total_annual_h2_kg
-              tonnes_per_truck_kg
-              turns_per_truck
-              annual_distance_per_truck_km
-          """
-          if self.number_of_trucks is None or self.number_of_trucks <= 0:
-              raise ValueError("number_of_trucks must be set and >0 before computing annual metrics")
+            """
+            Calculates annual transport metrics per truck using hourly trailer dispatch.
+            """
+            import numpy as np
 
-          if self.trailer_load_kg is None or self.trailer_load_kg <= 0:
-              raise ValueError("trailer_load_kg must be >0 before calculating turns per truck")
+            if self.number_of_trucks is None or self.number_of_trucks <= 0:
+                raise ValueError("number_of_trucks must be set and >0 before computing annual metrics")
 
-          #  Total annual hydrogen transported (kg/year)
-          self.total_annual_h2_kg = self.Q2_kgph * 8760
+            if self.trailer_load_kg is None or self.trailer_load_kg <= 0:
+                raise ValueError("trailer_load_kg must be >0 before calculating turns per truck")
 
-          # Safety check
-          if self.number_of_trucks <= 0:
-              return 0.0, 0.0, 0.0, 0.0
+            # Total annual hydrogen transported
+            self.total_annual_h2_transported_kg = (
+                np.sum(self.trailers_completely_filled) * self.trailer_load_kg
+            )
 
-          # Hydrogen transported per truck per year (kg/year)
-          self.tonnes_per_truck_kg = self.total_annual_h2_kg / self.number_of_trucks
+            # Hydrogen transported per truck per year
+            self.tonnes_per_truck_kg = self.total_annual_h2_transported_kg / self.number_of_trucks
 
-          # Number of turns per truck per year
-          self.turns_per_truck = self.tonnes_per_truck_kg / self.trailer_load_kg
+            # Number of turns per truck per year
+            self.turns_per_truck = (
+                np.sum(self.trailers_completely_filled) / self.number_of_trucks
+            )
 
-          # Total annual round-trip distance per truck (km/year)
-          self.annual_distance_per_truck_km = (
-              2 * self.distance_km * self.turns_per_truck
-          )
+            # Total annual round-trip distance per truck (km/year)
+            self.annual_distance_per_truck_km = (
+                np.sum(self.trailers_completely_filled) * 2 * self.distance_km
+            ) / self.number_of_trucks
 
 
     #------------Booster -------------
@@ -535,6 +532,7 @@ class HydrogenTruckTransport:
             self.total_ghg_per_year = total_ghg_per_year
             self.booster_capex_total = booster_capex_total
             self.booster_opex_total = booster_opex_total
+           
 
             self.total_fuel = total_fuel
             self.total_salary = total_salary
@@ -571,5 +569,6 @@ class HydrogenTruckTransport:
                 "total_salary": total_salary,
                 "total_recertification": total_recertification,
                 "total_other_o_n_m": total_other_o_n_m,
-                "total_tractor_capex_as_opex": total_tractor_capex_as_opex
+                "total_tractor_capex_as_opex": total_tractor_capex_as_opex,
+                "total_annual_h2_transported_kg": self.total_annual_h2_transported_kg
             }

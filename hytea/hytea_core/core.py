@@ -544,7 +544,7 @@ class HyTEACore:
         3. electrolyser total H2
         """
         if self.transport_results:
-            val = float(self.transport_results.get("total_annual_h2_kg", 0.0))
+            val = float(self.transport_results.get("total_annual_h2_transported_kg", 0.0))
             if val > 0:
                 return val
 
