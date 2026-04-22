@@ -579,7 +579,7 @@ class HyTEACore:
     # ==========================
     # Cost breakdown
     # =========================
-
+    #TEST 10 - PENDING
 
     def build_cost_breakdown(self):
         """
@@ -612,7 +612,9 @@ class HyTEACore:
             rese_capex += float(rese_result.get("capex", 0.0))
             rese_opex += float(rese_result.get("opex", 0.0))
 
+        #USE STREAM WISE POWER TO GET ELECTRICITY COST BASED ON RESE_INCLUDED IN BOUNDARY CONDITION or NOT Also have user input of €/MWh for each stream
 
+        #GRID IS MISSING
 
         # -------------------------------------------- Electrolyser --------------------------------------------
         elec_totals = self.electrolyser_results.get("totals", {})
@@ -624,7 +626,14 @@ class HyTEACore:
         storage_total_capex = float(self.storage_results.get("total_storage_capex", 0.0))
         storage_total_opex = float(self.storage_results.get("total_storage_opex", 0.0))
         compressor_liquefier_capex = float(self.storage_results.get("total_compressor_capex", 0.0))
+        #compressor opex missing
 
+
+
+
+
+
+        #below is unecessary
         hourly_prod_kgph = np.asarray(
             self.storage_results.get("hourly_production_kgph", np.array([])),
             dtype=float
@@ -652,10 +661,21 @@ class HyTEACore:
         # storage opex excluding compressor/liquefier opex
         storage_opex = max(storage_total_opex - compressor_liquefier_opex, 0.0)
 
+        #TILL THIS 
+
+
+
+
+
+
+
         # -------------------------------------------- Transport --------------------------------------------
 
         transport_capex = float(self.transport_results.get("transportation_capex", 0.0))
         transport_opex = float(self.transport_results.get("transportation_opex", 0.0))
+
+
+        #CHECK BELOW
 
         # ---------------- Adjusted electrolyser + compressor/liquefier block ----------------
         x = electrolyser_base_capex
@@ -683,7 +703,12 @@ class HyTEACore:
             + interconnection_cost
             + engineering_cost
             + installed_xy_cost
+
         )
+
+
+
+
 
         # ---------------- Totals ----------------
         total_capex = (
@@ -927,9 +952,6 @@ class HyTEACore:
             "levelized_cost_results": self.levelized_cost_results,
         }
     
-
-
-
 
     # ====================================================================
     # CHECK for H2 Balance
