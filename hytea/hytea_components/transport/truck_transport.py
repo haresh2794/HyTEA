@@ -279,7 +279,7 @@ class HydrogenTruckTransport:
 
             # Total annual hydrogen transported
             self.total_annual_h2_transported_kg = (
-                np.sum(self.trailers_completely_filled) * self.trailer_load_kg
+                np.sum(self.trailers_completely_filled_each_hour) * self.trailer_load_kg
             )
 
             # Hydrogen transported per truck per year
