@@ -287,12 +287,12 @@ class HydrogenTruckTransport:
 
             # Number of turns per truck per year
             self.turns_per_truck = (
-                np.sum(self.trailers_completely_filled) / self.number_of_trucks
+                np.sum(self.trailers_completely_filled_each_hour) / self.number_of_trucks
             )
 
             # Total annual round-trip distance per truck (km/year)
             self.annual_distance_per_truck_km = (
-                np.sum(self.trailers_completely_filled) * 2 * self.distance_km
+                np.sum(self.trailers_completely_filled_each_hour) * 2 * self.distance_km
             ) / self.number_of_trucks
 
 
