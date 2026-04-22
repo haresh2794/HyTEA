@@ -298,6 +298,8 @@ class HydrogenTruckTransport:
                 np.sum(self.trailers_completely_filled_each_hour) * 2 * self.distance_km
             ) / self.number_of_trucks
 
+            self.total_annual_fleet_distance = np.sum(self.trailers_completely_filled_each_hour) * 2 * self.distance_km
+
 
     #------------Booster -------------
 
@@ -574,5 +576,6 @@ class HydrogenTruckTransport:
                 "total_other_o_n_m": total_other_o_n_m,
                 "total_tractor_capex_as_opex": total_tractor_capex_as_opex,
                 "total_annual_h2_transported_kg": self.total_annual_h2_transported_kg,
-                "number_of_fills" : self.number_of_fills 
+                "number_of_fills" : self.number_of_fills,
+                "total_annual_fleet_distance": self.total_annual_fleet_distance
             }
