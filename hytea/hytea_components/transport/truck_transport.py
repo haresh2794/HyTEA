@@ -78,9 +78,9 @@ class HydrogenTruckTransport:
         self.tractor_cost_defaults = {
             'Diesel': {
                 'tractor_capex': 150000,
-                'spec_fuel_kWh_per_km': 3.29, #kWh/km/truck
+                'spec_fuel_kWh_per_km': 3.2945, #kWh/km/truck
                 'fuel_price_per_kWh': 0.20, #€/kWh/truck
-                'fuel_price_per_km': 0.20*3.29, #€/km/truck
+                'fuel_price_per_km': 0.20*3.2945, #€/km/truck
                 'fuel_ghg_g_per_kWh': 263, #gCO2/kWh/truck
                 'drivers_per_truck': 4,
                 'other_employees_per_truck': 1.1,
@@ -557,7 +557,7 @@ class HydrogenTruckTransport:
                 "fuel_per_truck": fuel_per_truck, #ISSUE
                 "salary_per_truck": salary_per_truck,
                 "recertification_per_truck": recertification_per_truck,
-                "other_o_n_m_per_truck": other_o_n_m_per_truck, #ISSUE
+                "other_o_n_m_per_truck": other_o_n_m_per_truck, 
                 "opex_per_truck": opex_per_truck,
                 "number_of_trucks": number_of_trucks,
                 "truck_fleet_capex": truck_fleet_capex,
@@ -567,7 +567,7 @@ class HydrogenTruckTransport:
                 "total_ghg_per_year": total_ghg_per_year,
                 "booster_capex_total": booster_capex_total,
                 "booster_opex_total": booster_opex_total,
-                "boost_spec_capex": self.boost_spec_capex , #ISSUE
+                "boost_spec_capex": self.boost_spec_capex , 
                 "booster_spec_elec_consumption": self.sec_boost_kWh_per_kg,
                 "P2_bar": self.P2_bar,
                 "total_fuel": total_fuel,
