@@ -613,11 +613,7 @@ class HyTEACore:
         x = electrolyser base CAPEX
         y = compressor/liquefier base CAPEX
 
-        adjusted_xy_capex =
-            EMU cost
-            + interconnection cost
-            + engineering cost
-            + 1.5652 * ((electrolyser_capacity * 1000)^-0.154) * (x + y)
+    
 
         IMPORTANT:
         x+y is NOT added again separately, to avoid double counting.
@@ -779,6 +775,7 @@ class HyTEACore:
         # ---------------- Totals ----------------
         total_capex = (
             rese_capex
+            + electrolyser_capex 
             + other_capex
             + storage_total_capex
             + transport_capex
