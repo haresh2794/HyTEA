@@ -796,16 +796,19 @@ class HyTEACore:
 
         annual_h2_kg = self._get_annual_h2_for_lcoh() #Get annual h2 produced else if the delivered is required use _get_annual_h2_delivered_basis()
 
-        breakdown = {
+        breakdown = { #TEST 11 - PENDING
             "capex": {
                 "rese": rese_capex,
-                "main_equipment_cost": main_equipment_cost,
+                "electrolyser":electrolyser_capex,
+                "grid": 0,
+                "compressor_liquefier": compressor_liquefier_capex,
                 "emu_cost": emu_cost,
                 "interconnection_cost": interconnection_cost,
                 "engineering_cost": engineering_cost,
                 "other_cost": other_cost,
                 "storage": storage_total_capex,
                 "transport": transport_capex,
+                "water":0,
             },
             "capex_sub_breakdown": {
                 "electrolyser_capex": electrolyser_capex,
@@ -820,11 +823,15 @@ class HyTEACore:
             "opex": {
                 "rese": rese_opex,
                 "electrolyser": electrolyser_opex,
-                "grid_opex": grid_opex,
+                "grid": grid_opex,
                 "compressor_liquefier": compressor_liquefier_opex,
+                "emu_cost": 0,
+                "interconnection_cost": 0,
+                "engineering_cost": 0,
+                "other_cost": 0,
                 "storage": storage_total_opex,
                 "transport": transport_opex,
-                "water_opex":water_opex,
+                "water":water_opex,
                 
             },
             "totals": {
@@ -892,145 +899,133 @@ class HyTEACore:
 
     def run_economics(self):
         """
-        Build total and individual discounted costs, then calculate total and individual LCOH.
+        Clean LCOH calculation framework:
+
+        Outputs:
+        - Total LCOH
+        - CAPEX-only LCOH
+        - OPEX-only LCOH
+        - Individual CAPEX LCOH contributions
+        - Individual OPEX LCOH contributions
+        - Component-wise combined LCOH (CAPEX + OPEX)
         """
+
         breakdown = self.build_cost_breakdown()
 
         capex_items = breakdown["capex"]
         opex_items = breakdown["opex"]
         annual_h2_kg = breakdown["totals"]["annual_h2_kg"]
 
-
-        # ---------------- Discount hydrogen ----------------
-        h2_discounting = self._discount_hydrogen(annual_h2_kg)
-        discounted_h2 = float(h2_discounting["total_present_value"])
+        # ============================================================
+        # 1. Discount hydrogen
+        # ============================================================
+        h2_discount = self._discount_hydrogen(annual_h2_kg)
+        discounted_h2 = float(h2_discount["total_present_value"])
 
         if discounted_h2 <= 0:
-            raise ValueError("Discounted hydrogen must be greater than zero for LCOH calculation.")
-        
+            raise ValueError("Discounted hydrogen must be > 0")
 
-        # ---------------- Discount CAPEX items ----------------
+        # ============================================================
+        # 2. Discount CAPEX
+        # ============================================================
         discounted_capex = {}
         for name, value in capex_items.items():
-            discounted_capex[name] = self._discount_single_cost_item(
+            res = self._discount_single_cost_item(
                 initial_value=value,
                 annual_value=0.0
             )
+            discounted_capex[name] = float(res["total_present_value"])
 
-
-        # ---------------- Discount OPEX items ----------------
+        # ============================================================
+        # 3. Discount OPEX
+        # ============================================================
         discounted_opex = {}
         for name, value in opex_items.items():
-            discounted_opex[name] = self._discount_single_cost_item(
+            res = self._discount_single_cost_item(
                 initial_value=0.0,
                 annual_value=value
             )
+            discounted_opex[name] = float(res["total_present_value"])
 
-
-        # ---------------- Total discounted cost ----------------
-        total_discounted_capex = sum(
-            float(res["total_present_value"]) for res in discounted_capex.values()
-        )
-        total_discounted_opex = sum(
-            float(res["total_present_value"]) for res in discounted_opex.values()
-        )
+        # ============================================================
+        # 4. Totals
+        # ============================================================
+        total_discounted_capex = sum(discounted_capex.values())
+        total_discounted_opex = sum(discounted_opex.values())
         total_discounted_cost = total_discounted_capex + total_discounted_opex
 
+        # ============================================================
+        # 5. Total LCOH
+        # ============================================================
+        total_lcoh = total_discounted_cost / discounted_h2
 
-        # ---------------- Total LCOH ----------------
-        total_lcoh_model = LevelizedCostModel()
-        total_lcoh_model.configure({
-            "discounted_numerator_total": total_discounted_cost,
-            "discounted_denominator_total": discounted_h2,
-        })
-        total_lcoh_results = total_lcoh_model.evaluate()
+        # ============================================================
+        # 6. CAPEX vs OPEX LCOH split
+        # ============================================================
+        capex_lcoh = total_discounted_capex / discounted_h2
+        opex_lcoh = total_discounted_opex / discounted_h2
 
-
-
-        # ---------------- Individual LCOH ----------------
-        individual_lcoh = {
-            "capex": {},
-            "opex": {},
-            "combined": {}
+        # ============================================================
+        # 7. Individual CAPEX LCOH
+        # ============================================================
+        capex_lcoh_breakdown = {
+            name: val / discounted_h2
+            for name, val in discounted_capex.items()
         }
 
+        # ============================================================
+        # 8. Individual OPEX LCOH
+        # ============================================================
+        opex_lcoh_breakdown = {
+            name: val / discounted_h2
+            for name, val in discounted_opex.items()
+        }
 
-        # CAPEX LCOH
-        for name, res in discounted_capex.items():
-            lc_model = LevelizedCostModel()
-            lc_model.configure({
-                "discounted_numerator_total": float(res["total_present_value"]),
-                "discounted_denominator_total": discounted_h2,
-            })
-            individual_lcoh["capex"][name] = lc_model.evaluate()["levelized_cost"]
+        # ============================================================
+        # 9. Component-wise LCOH (CAPEX + OPEX) #TEST 11 - PENDING
+        # ============================================================
+        component_lcoh = {} #TEST 11 - PENDING
 
+        # Components that exist in BOTH CAPEX and OPEX
+        all_components = set(capex_items.keys()).union(set(opex_items.keys()))
 
-        # OPEX LCOH
-        for name, res in discounted_opex.items():
-            lc_model = LevelizedCostModel()
-            lc_model.configure({
-                "discounted_numerator_total": float(res["total_present_value"]),
-                "discounted_denominator_total": discounted_h2,
-            })
-            individual_lcoh["opex"][name] = lc_model.evaluate()["levelized_cost"]
+        for comp in all_components:
+            capex_val = discounted_capex.get(comp, 0.0)
+            opex_val = discounted_opex.get(comp, 0.0)
 
+            component_lcoh[comp] = (capex_val + opex_val) / discounted_h2
 
-        # Combined CAPEX + OPEX by component
-        combined_components = ["rese", "storage", "transport"]
-
-        for name in combined_components:
-            capex_val = float(discounted_capex.get(name, {}).get("total_present_value", 0.0))
-            opex_val = float(discounted_opex.get(name, {}).get("total_present_value", 0.0))
-
-            lc_model = LevelizedCostModel()
-            lc_model.configure({
-                "discounted_numerator_total": capex_val + opex_val,
-                "discounted_denominator_total": discounted_h2,
-            })
-            individual_lcoh["combined"][name] = lc_model.evaluate()["levelized_cost"]
-
-
-        # Combined block for electrolyser + compressor/liquefier
-        block_capex = float(
-            discounted_capex["electrolyser_plus_compressor_liquefier"]["total_present_value"]
-        )
-        block_opex = (
-            float(discounted_opex["electrolyser"]["total_present_value"])
-            + float(discounted_opex["compressor_liquefier"]["total_present_value"])
-        )
-
-        lc_model = LevelizedCostModel()
-        lc_model.configure({
-            "discounted_numerator_total": block_capex + block_opex,
-            "discounted_denominator_total": discounted_h2,
-        })
-        individual_lcoh["combined"]["electrolyser_plus_compressor_liquefier"] = lc_model.evaluate()["levelized_cost"]
-
+        # ============================================================
+        # 10. Store results
+        # ============================================================
         self.discounting_results = {
-            "capex": discounted_capex,
-            "opex": discounted_opex,
-            "hydrogen": h2_discounting,
-            "discounted_total_capex": total_discounted_capex,
-            "discounted_total_opex": total_discounted_opex,
-            "discounted_total_cost": total_discounted_cost,
-            "discounted_total_h2": discounted_h2,
+            "discounted_capex": discounted_capex,
+            "discounted_opex": discounted_opex,
+            "discounted_h2": discounted_h2,
+            "total_discounted_capex": total_discounted_capex,
+            "total_discounted_opex": total_discounted_opex,
+            "total_discounted_cost": total_discounted_cost,
         }
 
         self.levelized_cost_results = {
-            "total_lcoh": total_lcoh_results["levelized_cost"],
-            "individual_lcoh": individual_lcoh,
+            "total_lcoh": total_lcoh,
+            "capex_lcoh": capex_lcoh,
+            "opex_lcoh": opex_lcoh,
+            "capex_lcoh_breakdown": capex_lcoh_breakdown,
+            "opex_lcoh_breakdown": opex_lcoh_breakdown,
+            "component_lcoh": component_lcoh,
         }
 
         return {
-            "economics_breakdown": self.economics_results,
+            "economics_breakdown": breakdown,
             "discounting_results": self.discounting_results,
             "levelized_cost_results": self.levelized_cost_results,
         }
     
 
-    # ====================================================================
+    # =========================================================================================
     # CHECK for H2 Balance
-    # ====================================================================
+    # =========================================================================================
 
     def check_annual_h2_balance(self):
         """
