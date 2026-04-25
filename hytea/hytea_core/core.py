@@ -599,7 +599,7 @@ class HyTEACore:
     # ==========================
     # Cost breakdown
     # =========================
-    #TEST 10 - PENDING
+    
 
     def build_cost_breakdown(self):
         """
@@ -626,6 +626,8 @@ class HyTEACore:
 
 
         # -------------------------------------------- RESE --------------------------------------------
+        #USE STREAM WISE POWER TO GET ELECTRICITY COST BASED ON RESE_INCLUDED IN BOUNDARY CONDITION or NOT Also have user input of €/MWh for each stream
+        #TEST 10 - 
         rese_capex = 0.0
         rese_opex = 0.0
 
@@ -661,60 +663,81 @@ class HyTEACore:
 
                 rese_capex += float(rese_result.get("capex", 0.0))
                 rese_opex += float(rese_result.get("opex", 0.0))
-        #USE STREAM WISE POWER TO GET ELECTRICITY COST BASED ON RESE_INCLUDED IN BOUNDARY CONDITION or NOT Also have user input of €/MWh for each stream
+        
+        
 
-        #GRID IS MISSING
+
+        # -------------------------------------------- Grid ----------------------------------------------------
+        grid_opex = 0.0
+
+        if self.config.get("integrate_grid", False):
+
+            streams = self.electrolyser_results.get("streams", {})
+            grid_stream = streams.get("grid", {})
+
+            energy_kWh_array = grid_stream.get("energy_used_kWh", None)
+
+            if energy_kWh_array is not None:
+
+                energy_kWh_array = np.asarray(energy_kWh_array, dtype=float)
+
+                grid_cfg = self.config.get("grid", {})
+                use_fixed = grid_cfg.get("use_fixed_rate", False)
+
+                # ---------------------------------
+                # CASE 1: FIXED RATE
+                # ---------------------------------
+                if use_fixed:
+                    avg_price = float(grid_cfg.get("avg_grid_price", 0.0))
+
+                    total_energy_MWh = float(np.sum(energy_kWh_array)) / 1000.0
+
+                    grid_opex = total_energy_MWh * avg_price
+
+                # ---------------------------------
+                # CASE 2: HOURLY PRICE
+                # ---------------------------------
+                else:
+                    if not self.grid_results or "hourly_purchase_price_trend" not in self.grid_results:
+                        raise ValueError("Hourly grid pricing requested but grid results not available")
+
+                    price_array = np.asarray(
+                        self.grid_results["hourly_purchase_price_trend"],
+                        dtype=float
+                    )
+
+                    if len(price_array) != len(energy_kWh_array):
+                        raise ValueError("Mismatch: grid price and energy arrays must have same length")
+
+                    # €/MWh → €/kWh
+                    price_per_kWh = price_array / 1000.0
+
+                    grid_opex = float(np.sum(energy_kWh_array * price_per_kWh))
+
+
 
         # -------------------------------------------- Electrolyser --------------------------------------------
         elec_totals = self.electrolyser_results.get("totals", {})
-        electrolyser_base_capex = float(elec_totals.get("capex", 0.0))
+        electrolyser_capex = float(elec_totals.get("capex", 0.0))
         electrolyser_opex = float(elec_totals.get("opex", 0.0))
+
+
+        #-----------------------------------------water---------------------------------------------------------
+        water_cfg = self.config.get("water", {})
+        water_price = float(water_cfg.get("water_cost_eur_per_m3", 2.38))
+        total_water_m3 = float(
+            self.electrolyser_results.get("totals", {}).get("water_m3", 0.0)
+        )
+
+        water_opex = total_water_m3 * water_price
+
 
 
         # -------------------------------------------- Storage split --------------------------------------------
         storage_total_capex = float(self.storage_results.get("total_storage_capex", 0.0))
         storage_total_opex = float(self.storage_results.get("total_storage_opex", 0.0))
         compressor_liquefier_capex = float(self.storage_results.get("total_compressor_capex", 0.0))
-        #compressor opex missing
-
-
-
-
-
-
-        #below is unecessary
-        hourly_prod_kgph = np.asarray(
-            self.storage_results.get("hourly_production_kgph", np.array([])),
-            dtype=float
-        )
-        annual_prod_kg = float(np.sum(hourly_prod_kgph)) if hourly_prod_kgph.size > 0 else 0.0
-
-        storage_method = self.storage_model.storage_method
-        energy_cost = float(self.storage_model.energy_cost)
-
-        if storage_method == "Liquid H2":
-            process_energy_opex = float(self.storage_model.liq_storage_sec) * energy_cost * annual_prod_kg
-        else:
-            process_energy_opex = float(self.storage_model.sec_compressor) * energy_cost * annual_prod_kg
-
-        # compressor/liquefier opex = 2% fixed + process energy term
-        compressor_liquefier_fixed_opex = 0.02 * compressor_liquefier_capex
-        compressor_liquefier_opex = compressor_liquefier_fixed_opex + process_energy_opex
-
-        # storage capex excluding compressor/liquefier capex
-        if self.storage_model.com_liq_included:
-            storage_capex = max(storage_total_capex - compressor_liquefier_capex, 0.0)
-        else:
-            storage_capex = storage_total_capex
-
-        # storage opex excluding compressor/liquefier opex
-        storage_opex = max(storage_total_opex - compressor_liquefier_opex, 0.0)
-
-        #TILL THIS 
-
-
-
-
+        compressor_liquefier_opex = float(self.storage_results.get("total_compressor_opex", 0.0))
 
 
 
@@ -723,14 +746,12 @@ class HyTEACore:
         transport_capex = float(self.transport_results.get("transportation_capex", 0.0))
         transport_opex = float(self.transport_results.get("transportation_opex", 0.0))
 
+        
 
-        #CHECK BELOW
+        # ----------------Interconnection Energy manangement Enginnering and Other costs----------------
 
-        # ---------------- Adjusted electrolyser + compressor/liquefier block ----------------
-        x = electrolyser_base_capex
-        y = compressor_liquefier_capex
-        xy = x + y
-
+        main_equipment_cost = electrolyser_capex + compressor_liquefier_capex
+       
         energy_management_factor = float(economics_cfg.get("energy_management_factor", 0.10))
         interconnection_factor = float(economics_cfg.get("interconnection_factor", 0.20))
         engineering_factor = float(economics_cfg.get("engineering_factor", 0.15))
@@ -738,41 +759,39 @@ class HyTEACore:
         electro_capacity_kw = float(self.electrolyser_model.electro_capacity) * 1000.0
 
         if electro_capacity_kw > 0:
-            installed_xy_factor = 1.5652 * (electro_capacity_kw ** (-0.154))
+            other_cost_factor = 1.5652 * (electro_capacity_kw ** (-0.154))
         else:
-            installed_xy_factor = 0.0
+            other_cost_factor = 0.0
 
-        emu_cost = energy_management_factor * xy
-        interconnection_cost = interconnection_factor * xy
-        engineering_cost = engineering_factor * xy
-        installed_xy_cost = installed_xy_factor * xy
+        emu_cost = energy_management_factor * main_equipment_cost
+        interconnection_cost = interconnection_factor * main_equipment_cost
+        engineering_cost = engineering_factor * main_equipment_cost
+        other_cost = other_cost_factor * main_equipment_cost
 
-        adjusted_xy_capex = (
+        other_capex = (
             emu_cost
             + interconnection_cost
             + engineering_cost
-            + installed_xy_cost
+            + other_cost
 
         )
-
-
-
-
 
         # ---------------- Totals ----------------
         total_capex = (
             rese_capex
-            + adjusted_xy_capex
-            + storage_capex
+            + other_capex
+            + storage_total_capex
             + transport_capex
         )
 
         total_opex = (
             rese_opex
             + electrolyser_opex
+            + grid_opex
             + compressor_liquefier_opex
-            + storage_opex
+            + storage_total_opex
             + transport_opex
+            + water_opex
         )
 
         annual_h2_kg = self._get_annual_h2_for_lcoh() #Get annual h2 produced else if the delivered is required use _get_annual_h2_delivered_basis()
@@ -780,26 +799,33 @@ class HyTEACore:
         breakdown = {
             "capex": {
                 "rese": rese_capex,
-                "electrolyser_plus_compressor_liquefier": adjusted_xy_capex,
-                "storage": storage_capex,
-                "transport": transport_capex,
-            },
-            "capex_sub_breakdown": {
-                "electrolyser_base_capex_x": x,
-                "compressor_liquefier_base_capex_y": y,
-                "xy_base_capex": xy,
+                "main_equipment_cost": main_equipment_cost,
                 "emu_cost": emu_cost,
                 "interconnection_cost": interconnection_cost,
                 "engineering_cost": engineering_cost,
-                "installed_xy_cost": installed_xy_cost,
-                "installed_xy_factor": installed_xy_factor,
+                "other_cost": other_cost,
+                "storage": storage_total_capex,
+                "transport": transport_capex,
+            },
+            "capex_sub_breakdown": {
+                "electrolyser_capex": electrolyser_capex,
+                "compressor_liquefier_capex": compressor_liquefier_capex,
+                "main_equipment_cost": main_equipment_cost,
+                "emu_cost": emu_cost,
+                "interconnection_cost": interconnection_cost,
+                "engineering_cost": engineering_cost,
+                "other_cost": other_cost,
+                "other_cost_factor": other_cost_factor,
             },
             "opex": {
                 "rese": rese_opex,
                 "electrolyser": electrolyser_opex,
+                "grid_opex": grid_opex,
                 "compressor_liquefier": compressor_liquefier_opex,
-                "storage": storage_opex,
+                "storage": storage_total_opex,
                 "transport": transport_opex,
+                "water_opex":water_opex,
+                
             },
             "totals": {
                 "total_capex": total_capex,
