@@ -528,6 +528,26 @@ class HyTEACore:
 
         return self.transport_results
     
+    #===============================
+    #Validations
+    #===============================
+    
+    def validate_energy_balance(self):
+        streams = self.electrolyser_results.get("streams", {})
+        totals = self.electrolyser_results.get("totals", {})
+
+        total_from_streams = sum(
+            s.get("totals", {}).get("energy_used_kWh", 0.0)
+            for s in streams.values()
+        )
+
+        total_system = float(totals.get("energy_electrolysis_kWh", 0.0))
+
+        if not np.isclose(total_from_streams, total_system, rtol=1e-5):
+            raise ValueError(
+                f"Energy mismatch: streams sum = {total_from_streams}, system total = {total_system}"
+            )
+    
     #==============================================================================================================================================================
     # ECONOMICS  
     #===============================================================================================================================================================
@@ -608,10 +628,39 @@ class HyTEACore:
         # -------------------------------------------- RESE --------------------------------------------
         rese_capex = 0.0
         rese_opex = 0.0
-        for _, rese_result in self.rese_results.items():
-            rese_capex += float(rese_result.get("capex", 0.0))
-            rese_opex += float(rese_result.get("opex", 0.0))
 
+        streams = self.electrolyser_results.get("streams", {})
+
+        for source_name, source_cfg in self.config["rese_sources"].items():
+
+            include = source_cfg.get("include_in_boundary", True)
+
+            if not include:
+                price = source_cfg.get("price_eur_per_mwh")
+                if price is None:
+                    raise ValueError(
+                        f"RESE source '{source_name}' is outside boundary but has no price defined."
+                    )
+
+                price = float(price)
+
+                streams = self.electrolyser_results.get("streams", {})
+
+                energy_kWh = float(
+                    streams.get(source_name, {})
+                        .get("totals", {})
+                        .get("energy_used_kWh", 0.0)
+                )
+
+                energy_MWh = energy_kWh / 1000.0
+
+                rese_opex += energy_MWh * price
+
+            else:
+                rese_result = self.rese_results.get(source_name, {})
+
+                rese_capex += float(rese_result.get("capex", 0.0))
+                rese_opex += float(rese_result.get("opex", 0.0))
         #USE STREAM WISE POWER TO GET ELECTRICITY COST BASED ON RESE_INCLUDED IN BOUNDARY CONDITION or NOT Also have user input of €/MWh for each stream
 
         #GRID IS MISSING
@@ -1012,6 +1061,7 @@ class HyTEACore:
         self.run_grid()
         self.setup_electrolyser()
         self.run_electrolyser()
+        self.validate_energy_balance()
         self.run_storage()
         self.run_transport()
         self.run_economics()

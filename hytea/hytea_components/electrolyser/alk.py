@@ -374,18 +374,17 @@ class ALKElectrolyser:
             self.LHV_h2 / efficiency,
             np.inf
         )
-
+    	
         # ======================
         # Hydrogen production (kg/h)
         # ======================
         h2_hourly_kg = np.where(
             energy_used_kWh > 0,
             self.h2_from_energy_kWh(energy_used_kWh, sec_electrolyser),
-            0.0
-)
-
+            0.0)
         
-      
+        
+
         # ======================
         # Downstream processes (hourly)
         # ======================
