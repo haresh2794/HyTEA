@@ -113,7 +113,7 @@ class ALKElectrolyser:
 
     def _default_water_consumption(self):
         # default water consumption
-        return 0.0015
+        return 0.015
 
     def _default_annual_improvement(self):
         return 1.001
@@ -382,7 +382,7 @@ class ALKElectrolyser:
             energy_used_kWh > 0,
             self.h2_from_energy_kWh(energy_used_kWh, sec_electrolyser),
             0.0)
-        
+
         
 
         # ======================
