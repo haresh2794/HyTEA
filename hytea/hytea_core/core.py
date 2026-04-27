@@ -744,7 +744,7 @@ class HyTEACore:
 
         
 
-        # ----------------Interconnection Energy manangement Enginnering and Other costs----------------
+        # ----------------Interconnection, Energy manangement Enginnering and Other costs----------------
 
         main_equipment_cost = electrolyser_capex + compressor_liquefier_capex
        
