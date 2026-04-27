@@ -845,7 +845,7 @@ class HyTEACore:
 
 
 
-
+    # Discounting number are wrong - TEST 11
     def _discount_single_cost_item(self, initial_value=0.0, annual_value=0.0):
         """
         Discount one cost item using the generic DiscountingModel.
