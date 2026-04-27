@@ -96,7 +96,9 @@ class ALKElectrolyser:
         return x*self.electro_capacity**y #€/kW
     
     def _default_opex_per(self):
-        return 0.03 #fraction of capex
+        x = 0.0382491000032438
+        y = -0.162310911368658
+        return x*self.electro_capacity**(-0.162310911368658) #fraction of capex
     
     def _default_outlet_pressure(self):
         return 15 #bar

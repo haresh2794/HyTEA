@@ -776,6 +776,7 @@ class HyTEACore:
         total_capex = (
             rese_capex
             + electrolyser_capex 
+            + compressor_liquefier_capex
             + other_capex
             + storage_total_capex
             + transport_capex
