@@ -299,15 +299,32 @@ class HyTEACore:
     #Build the Rese dataframe required for electrolyse input from the rese_results > hourly_output_mw, as electrolyser streamwise input power 
     #========================================================
 
-    def build_rese_power_df(self): #TEST 2 COMPLETED 
+    #RESE CAP added for electricity export priority
+    def build_rese_power_df(self):
         """
-        Build stream-wise RESE power DataFrame in kW.
+        Build stream-wise RESE power DataFrame in kW,
+        applying electricity export priority caps if configured.
         """
         stream_power = {}
 
+        rese_config = self.config.get("rese_sources", {})
+
         for source_name, result in self.rese_results.items():
             hourly_output_mw = np.asarray(result["hourly_output_mw"], dtype=float)
-            stream_power[source_name] = hourly_output_mw * 1000.0  # MW -> kW
+
+            
+            source_cfg = rese_config.get(source_name, {})
+            priority_export = source_cfg.get("priority_electricity_export", False)
+            export_cap_mw = float(source_cfg.get("electricity_export_cap_mw", 0.0))
+
+            if priority_export and export_cap_mw > 0:
+                # Subtract export 
+                adjusted_output_mw = np.maximum(hourly_output_mw - export_cap_mw, 0.0)
+            else:
+                adjusted_output_mw = hourly_output_mw
+
+            # Convert to kW
+            stream_power[source_name] = adjusted_output_mw * 1000.0
 
         if not stream_power:
             raise ValueError("No RESE stream outputs available for electrolyser input.")
