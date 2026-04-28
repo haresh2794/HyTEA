@@ -1043,6 +1043,88 @@ class HyTEACore:
         }
     
 
+    # =========================================================================================
+    # GHG Intensity
+    # =========================================================================================
+
+    def calculate_ghg_intensity(self):
+        """
+        Calculate system GHG intensity considering:
+        - Grid electricity (used by electrolyser only)
+        - Transport emissions
+
+        Outputs:
+        - tCO2/tH2
+        - gCO2/kWh(H2)
+        """
+
+        # -------------------------
+        # 1. Grid emissions
+        # -------------------------
+        total_grid_ghg_t = 0.0
+
+        if self.config.get("integrate_grid", False):
+
+            # Energy actually used by electrolyser from grid (kWh)
+            grid_energy_kWh = np.asarray(
+                self.electrolyser_results["streams_energy_used_kWh"].get("grid", np.zeros(8760)),
+                dtype=float
+            )
+
+            # Grid GHG intensity (gCO2/kWh)
+            grid_ghg_intensity = np.asarray(
+                self.grid_summary.get("hourly_ghg_trend", np.zeros_like(grid_energy_kWh)),
+                dtype=float
+            )
+
+            # Convert to tonnes CO2
+            total_grid_ghg_t = np.sum(grid_energy_kWh * grid_ghg_intensity) / 1e6
+
+
+        # -------------------------
+        # 2. Transport emissions
+        # -------------------------
+        total_transport_ghg_t = 0.0
+
+        if self.transport_results:
+            total_transport_ghg_t = float(
+                self.transport_results.get("total_ghg_per_year", 0.0)
+            )
+
+
+        # -------------------------
+        # 3. Total emissions
+        # -------------------------
+        total_ghg_t = total_grid_ghg_t + total_transport_ghg_t
+
+
+        # -------------------------
+        # 4. Hydrogen production
+        # -------------------------
+        total_h2_kg = self._get_annual_h2_for_lcoh()
+
+        if total_h2_kg <= 0:
+            raise ValueError("Total H2 production is zero. Cannot compute GHG intensity.")
+
+        total_h2_t = total_h2_kg / 1000.0
+
+
+        # -------------------------
+        # 5. Metrics
+        # -------------------------
+        ghg_t_per_tH2 = total_ghg_t / total_h2_t
+
+        # Convert to gCO2/kWh (H2 basis)
+        ghg_g_per_kWh = (ghg_t_per_tH2 / 33.333) * 1000.0
+
+
+        return {
+            "total_ghg_t_per_year": total_ghg_t,
+            "grid_ghg_t_per_year": total_grid_ghg_t,
+            "transport_ghg_t_per_year": total_transport_ghg_t,
+            "ghg_t_per_tH2": ghg_t_per_tH2,
+            "ghg_g_per_kWh": ghg_g_per_kWh
+        }
     
 
     # =========================================================================================
