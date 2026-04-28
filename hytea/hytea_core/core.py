@@ -59,6 +59,7 @@ class HyTEACore:
         self.transport_results = {}
 
         self.power_df = None
+        self.rese_export_streams = {}
         self.grid_stream_kW = None
 
         self.economics_results = {}
@@ -312,18 +313,22 @@ class HyTEACore:
         for source_name, result in self.rese_results.items():
             hourly_output_mw = np.asarray(result["hourly_output_mw"], dtype=float)
 
-            
             source_cfg = rese_config.get(source_name, {})
             priority_export = source_cfg.get("priority_electricity_export", False)
             export_cap_mw = float(source_cfg.get("electricity_export_cap_mw", 0.0))
 
             if priority_export and export_cap_mw > 0:
-                # Subtract export 
+                # --- Export stream (what goes to grid/export) ---
+                export_mw = np.minimum(hourly_output_mw, export_cap_mw)
+                self.rese_export_streams[source_name] = export_mw  # Export stream added
+
+                # --- Remaining for electrolyser ---
                 adjusted_output_mw = np.maximum(hourly_output_mw - export_cap_mw, 0.0)
             else:
+                # No export priority
+                self.rese_export_streams[source_name] = np.zeros_like(hourly_output_mw)
                 adjusted_output_mw = hourly_output_mw
 
-            # Convert to kW
             stream_power[source_name] = adjusted_output_mw * 1000.0
 
         if not stream_power:
@@ -1036,6 +1041,8 @@ class HyTEACore:
             "discounting_results": self.discounting_results,
             "levelized_cost_results": self.levelized_cost_results,
         }
+    
+
     
 
     # =========================================================================================
