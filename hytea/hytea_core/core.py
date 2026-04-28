@@ -860,7 +860,7 @@ class HyTEACore:
             "initial_value": float(initial_value),
             "annual_value": float(annual_value),
             "additional_values": {},
-            "decommissioning_fraction": economics_cfg.get("decommissioning_fraction", 0.0),
+            "decommissioning_fraction": economics_cfg.get("decommissioning_fraction", 0.05),
         })
         return model.evaluate()
     
@@ -868,7 +868,7 @@ class HyTEACore:
 
 
 
-
+    #This seems okay 
     def _discount_hydrogen(self, annual_h2_kg):
         """
         Discount annual hydrogen denominator.
@@ -918,65 +918,65 @@ class HyTEACore:
         # 1. Discount hydrogen
         # ============================================================
         h2_discount = self._discount_hydrogen(annual_h2_kg)
-        discounted_h2 = float(h2_discount["total_present_value"])
+        total_pv_h2 = float(h2_discount["total_present_value"])
 
-        if discounted_h2 <= 0:
+        if total_pv_h2 <= 0:
             raise ValueError("Discounted hydrogen must be > 0")
 
         # ============================================================
         # 2. Discount CAPEX
         # ============================================================
-        discounted_capex = {}
+        total_pv_capex_breakdown = {}
         for name, value in capex_items.items():
             res = self._discount_single_cost_item(
                 initial_value=value,
                 annual_value=0.0
             )
-            discounted_capex[name] = float(res["total_present_value"])
+            total_pv_capex_breakdown[name] = float(res["total_present_value"])
 
         # ============================================================
         # 3. Discount OPEX
         # ============================================================
-        discounted_opex = {}
+        total_pv_opex_breakdown = {}
         for name, value in opex_items.items():
             res = self._discount_single_cost_item(
                 initial_value=0.0,
                 annual_value=value
             )
-            discounted_opex[name] = float(res["total_present_value"])
+            total_pv_opex_breakdown[name] = float(res["total_present_value"])
 
         # ============================================================
         # 4. Totals
         # ============================================================
-        total_discounted_capex = sum(discounted_capex.values())
-        total_discounted_opex = sum(discounted_opex.values())
-        total_discounted_cost = total_discounted_capex + total_discounted_opex
+        total_pv_capex = sum(total_pv_capex_breakdown.values())
+        total_pv_opex = sum(total_pv_opex_breakdown.values())
+        total_pv_costs = total_pv_capex + total_pv_opex
 
         # ============================================================
         # 5. Total LCOH
         # ============================================================
-        total_lcoh = total_discounted_cost / discounted_h2
+        total_lcoh = total_pv_costs / total_pv_h2
 
         # ============================================================
         # 6. CAPEX vs OPEX LCOH split
         # ============================================================
-        capex_lcoh = total_discounted_capex / discounted_h2
-        opex_lcoh = total_discounted_opex / discounted_h2
+        capex_lcoh = total_pv_capex / total_pv_h2
+        opex_lcoh = total_pv_opex / total_pv_h2
 
         # ============================================================
         # 7. Individual CAPEX LCOH
         # ============================================================
         capex_lcoh_breakdown = {
-            name: val / discounted_h2
-            for name, val in discounted_capex.items()
+            name: val / total_pv_h2
+            for name, val in total_pv_capex_breakdown.items()
         }
 
         # ============================================================
         # 8. Individual OPEX LCOH
         # ============================================================
         opex_lcoh_breakdown = {
-            name: val / discounted_h2
-            for name, val in discounted_opex.items()
+            name: val / total_pv_h2
+            for name, val in total_pv_opex_breakdown.items()
         }
 
         # ============================================================
@@ -988,21 +988,21 @@ class HyTEACore:
         all_components = set(capex_items.keys()).union(set(opex_items.keys()))
 
         for comp in all_components:
-            capex_val = discounted_capex.get(comp, 0.0)
-            opex_val = discounted_opex.get(comp, 0.0)
+            capex_val = total_pv_capex_breakdown.get(comp, 0.0)
+            opex_val = total_pv_opex_breakdown.get(comp, 0.0)
 
-            component_lcoh[comp] = (capex_val + opex_val) / discounted_h2
+            component_lcoh[comp] = (capex_val + opex_val) / total_pv_h2
 
         # ============================================================
         # 10. Store results
         # ============================================================
         self.discounting_results = {
-            "discounted_capex": discounted_capex,
-            "discounted_opex": discounted_opex,
-            "discounted_h2": discounted_h2,
-            "total_discounted_capex": total_discounted_capex,
-            "total_discounted_opex": total_discounted_opex,
-            "total_discounted_cost": total_discounted_cost,
+            "total_pv_capex_breakdown": total_pv_capex_breakdown,
+            "total_pv_opex_breakdown": total_pv_opex_breakdown,
+            "total_pv_h2": total_pv_h2,
+            "total_pv_capex": total_pv_capex,
+            "total_pv_opex": total_pv_opex,
+            "total_pv_costs": total_pv_costs,
         }
 
         self.levelized_cost_results = {
