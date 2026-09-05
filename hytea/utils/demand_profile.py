@@ -1,5 +1,4 @@
 import os
-import shutil
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
@@ -19,9 +18,8 @@ def load_demand_profile(
     If use_demand_file=False:
         Uses a constant hourly demand.
 
-    If use_demand_file=True:
-        Prompts the user to upload a CSV file and saves it
-        to the project's data/ folder.
+    If use_demand_file is a CSV path:
+        Loads the hourly demand profile from that CSV file.
 
     Returns
     -------
@@ -34,43 +32,13 @@ def load_demand_profile(
     # ==========================================================
     if use_demand_file:
 
-        try:
-            from google.colab import files
-        except ImportError:
-            raise ImportError(
-                "CSV upload is only supported in Google Colab."
+        input_file = use_demand_file
+
+        if not os.path.isfile(input_file):
+            raise FileNotFoundError(
+                f"Demand file not found: {input_file}"
             )
 
-        print("Please upload your hourly demand CSV file.")
-
-        uploaded = files.upload()
-
-        if not uploaded:
-            raise ValueError("No demand file was uploaded.")
-
-        uploaded_filename = next(iter(uploaded))
-
-        # ------------------------------------------------------
-        # Save uploaded file to data/
-        # ------------------------------------------------------
-        data_dir = "data"
-        os.makedirs(data_dir, exist_ok=True)
-
-        input_file = os.path.join(
-            data_dir,
-            os.path.basename(uploaded_filename)
-        )
-
-        shutil.move(
-            uploaded_filename,
-            input_file
-        )
-
-        print(f"Demand file saved to: {input_file}")
-
-        # ------------------------------------------------------
-        # Read demand profile
-        # ------------------------------------------------------
         df = pd.read_csv(input_file)
 
         if demand_column not in df.columns:
@@ -95,9 +63,7 @@ def load_demand_profile(
                 f"Found {len(demand)} hours."
             )
 
-        print(
-            f"Loaded demand profile from: {input_file}"
-        )
+        print(f"Loaded demand profile from: {input_file}")
 
     # ==========================================================
     # CONSTANT DEMAND
@@ -134,9 +100,7 @@ def load_demand_profile(
         plt.grid(True, alpha=0.3)
         plt.tight_layout()
 
-        # ------------------------------------------------------
-        # Save plot to plots/
-        # ------------------------------------------------------
+        # Save plot
         if save_plot:
 
             plot_dir = os.path.dirname(plot_file)
