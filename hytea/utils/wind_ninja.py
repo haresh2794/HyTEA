@@ -15,7 +15,7 @@ def generate_wind_cf_from_location(
     verbose=False,
     plot_cf=False,
     save_plot=False,
-    plot_file="data/wind_cf_plot.png",
+    plot_file="plots/wind_cf_plot.png",
 ):
     """
     Fetch hourly wind capacity factor data from Renewables Ninja
@@ -51,6 +51,10 @@ def generate_wind_cf_from_location(
         Whether to save the CF plot.
     plot_file : str, optional
         Path to save the plot image.
+
+
+
+        
 
     Returns
     -------

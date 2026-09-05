@@ -18,7 +18,7 @@ def generate_solar_cf_from_location(
     verbose=False,
     plot_cf=False,
     save_plot=False,
-    plot_file="data/solar_cf_plot.png",
+    plot_file="plots/solar_cf_plot.png",
 ):
     """
     Fetch hourly solar PV capacity factor data from Renewables Ninja
