@@ -68,7 +68,7 @@ class ALKElectrolyser:
         #calculating the energy for storage for inclusion in H2 production energy requirement
         self.storage_defaults = {
             "Compressed Tanks": {"pressure_bar": 300, "temperature_C": 25},
-            "Salt cavern(s)":   {"pressure_bar": 200, "temperature_C": 25},
+            "Salt cavern":   {"pressure_bar": 200, "temperature_C": 25},
             "Lined rock cavern":{"pressure_bar": 150, "temperature_C": 25},
             "Liquid H2":        {"pressure_bar": 1,   "temperature_C": -253},
         }

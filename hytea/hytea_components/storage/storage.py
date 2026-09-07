@@ -12,7 +12,7 @@ class HydrogenStorage:
         # ---------------- Storage Defaults ----------------
         self.storage_defaults = {
             "Compressed Tanks": {"pressure_bar": 300, "temperature_C": 25, "a": 0, "b": 0.370511713, "com_liq_included":False},
-            "Salt cavern(s)":   {"pressure_bar": 200, "temperature_C": 25, "a": 0.195420825585994, "b": 0.125411409869413, "com_liq_included":True},
+            "Salt cavern":   {"pressure_bar": 200, "temperature_C": 25, "a": 0.195420825585994, "b": 0.125411409869413, "com_liq_included":True},
             "Lined rock cavern":{"pressure_bar": 150, "temperature_C": 25, "a": 0.126197258645584, "b": 0.200511784228375, "com_liq_included":True},
             "Liquid H2":        {"pressure_bar": 1,   "temperature_C": -253, "a": None, "b": None, "com_liq_included":False},
         }

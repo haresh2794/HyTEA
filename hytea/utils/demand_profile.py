@@ -8,8 +8,8 @@ def load_demand_profile(
     use_demand_file=False,
     constant_demand=50,
     demand_column="demand",
-    plot_demand=True,
-    save_plot=True,
+    plot_demand=False,
+    save_plot=False,
     plot_file="plots/demand_profile.png"
 ):
     """
