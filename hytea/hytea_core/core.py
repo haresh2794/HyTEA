@@ -54,6 +54,8 @@ class HyTEACore:
 
         self.storage_model = None
         self.storage_results = {}
+        # Common hourly H2 supply stream used by downstream components
+        self.h2_supply_kgph = np.array([])
 
         self.transport_model = None
         self.transport_results = {}
@@ -442,6 +444,7 @@ class HyTEACore:
         Build storage config by combining user-provided storage inputs
         with internally available upstream electrolyser outputs.
         """
+        """
         #Ensure electrolyser has already run
         if not self.electrolyser_results:
             raise ValueError("Electrolyser results must exist before building storage config.")
@@ -460,6 +463,38 @@ class HyTEACore:
             storage_config["avg_sec_electrolyser"] = self.electrolyser_model.avg_sec_electrolyser
 
         return storage_config
+
+        """
+        storage_config = dict(self.config.get("storage", {}))
+
+        # Inject system-level H2 demand into storage model
+        if "hourly_demand_kgph" not in self.config:
+            raise ValueError(
+                "config must contain 'hourly_demand_kgph'."
+            )
+
+        storage_config["hourly_demand_kgph"] = np.asarray(
+            self.config["hourly_demand_kgph"],
+            dtype=float
+        )
+
+        # Inject H2 production from electrolyser
+        if "hourly_production_kgph" not in storage_config:
+            storage_config["hourly_production_kgph"] = np.asarray(
+                self.electrolyser_results["hourly"]["H2_kg"],
+                dtype=float
+            )
+
+        # Inject electrolyser capacity for storage sizing
+        if "electro_capacity" not in storage_config:
+            storage_config["electro_capacity"] = self.electrolyser_model.electro_capacity
+
+        # Inject electrolyser SEC
+        if "avg_sec_electrolyser" not in storage_config:
+            storage_config["avg_sec_electrolyser"] = self.electrolyser_model.avg_sec_electrolyser
+
+        return storage_config
+    
     
     #=================================================
     # Run Stroage
@@ -490,47 +525,105 @@ class HyTEACore:
 
         return self.storage_results
     
+    def build_h2_supply(self):
+        """
+        Build the common hourly hydrogen supply stream.
 
+        If storage is enabled:
+            H2 supply = storage supply
+
+        If storage is disabled:
+            H2 supply = electrolyser H2 production
+
+        Output:
+            self.h2_supply_kgph in kg/h
+        """
+
+        if self.config.get("use_storage", True):
+
+            if not self.storage_results:
+                raise ValueError(
+                    "Storage results are required when use_storage=True."
+                )
+
+            supply_tph = np.asarray(
+                self.storage_results["supply_tph"],
+                dtype=float
+            )
+
+            # Storage supply is tonnes/hour
+            self.h2_supply_kgph = supply_tph * 1000.0
+
+        else:
+
+            self.h2_supply_kgph = np.asarray(
+                self.electrolyser_results["hourly"]["H2_kg"],
+                dtype=float
+            )
+
+        return self.h2_supply_kgph
+    
     #============================================================================================================================================================================================
     # TRANSPORT
     #==============================================================================================================================================================================================
 
     def build_transport_config(self):
         """
-        Build transport config by combining user-provided transport inputs
-        with internally available upstream values.
+        Build transport config using the common H2 supply stream.
+
+        If storage is enabled, H2 supply comes from storage.
+        If storage is disabled, H2 supply comes directly from
+        the electrolyser.
         """
+
         transport_config = dict(self.config.get("transport", {}))
 
-        # Inject P0 from electrolyser outlet pressure if not provided
+        use_storage = self.config.get("use_storage", True)
+
+        # --------------------------------------------------
+        # P0: electrolyser outlet pressure
+        # --------------------------------------------------
         if "P0_bar" not in transport_config:
-            transport_config["P0_bar"] = self.electrolyser_model.outlet_pressure
+            transport_config["P0_bar"] = (
+                self.electrolyser_model.outlet_pressure
+            )
 
-        # Inject P1 from storage pressure if not provided
+        # --------------------------------------------------
+        # P1: storage pressure if storage is enabled
+        # Otherwise use P0 unless user explicitly provides P1
+        # --------------------------------------------------
         if "P1_bar" not in transport_config:
-            transport_config["P1_bar"] = self.storage_model.pout_bar
 
-        # Inject Q2 from upstream hourly hydrogen flow if not provided
+            if use_storage:
+                transport_config["P1_bar"] = (
+                    self.storage_model.pout_bar
+                )
+            else:
+                transport_config["P1_bar"] = (
+                    transport_config["P0_bar"]
+                )
+
+        # --------------------------------------------------
+        # Q2: average H2 supply to transport
+        # --------------------------------------------------
         if "Q2_kgph" not in transport_config:
-            if self.storage_results:
-                supply_tph = np.asarray(self.storage_results["supply_tph"], dtype=float)
-                transport_config["Q2_kgph"] = float(np.mean(supply_tph * 1000.0))
-            else:
-                hourly_h2_kg = np.asarray(self.electrolyser_results["hourly"]["H2_kg"], dtype=float)
-                transport_config["Q2_kgph"] = float(np.mean(hourly_h2_kg))
 
-        # Inject Q1 if not provided
+            transport_config["Q2_kgph"] = float(
+                np.mean(self.h2_supply_kgph)
+            )
+
+        # --------------------------------------------------
+        # Q1: maximum H2 supply to transport
+        # --------------------------------------------------
         if "Q1_kgph" not in transport_config:
-            if self.storage_results:
-                prod_kgph = np.asarray(self.storage_results["hourly_production_kgph"], dtype=float)
-                transport_config["Q1_kgph"] = float(np.max(prod_kgph))
-            else:
-                hourly_h2_kg = np.asarray(self.electrolyser_results["hourly"]["H2_kg"], dtype=float)
-                transport_config["Q1_kgph"] = float(np.max(hourly_h2_kg))
+
+            transport_config["Q1_kgph"] = float(
+                np.max(self.h2_supply_kgph)
+            )
 
         return transport_config
     
-    #=======================================
+    #======================================
     # Run Transport
     #======================================
 
@@ -1132,46 +1225,73 @@ class HyTEACore:
 
     def check_annual_h2_balance(self):
         """
-        Check whether annual hydrogen production is sufficient
+        Check whether annual hydrogen supply is sufficient
         to meet annual demand.
         """
 
-        annual_demand_kg = 0.0
-        if self.storage_results:
-            demand_kgph = np.asarray(
-                self.storage_results.get("hourly_demand_kgph", np.array([])),
-                dtype=float
-            )
-            if demand_kgph.size > 0:
-                annual_demand_kg = float(np.sum(demand_kgph))
+        # --------------------------------------------------
+        # H2 demand
+        # --------------------------------------------------
+        demand_kgph = np.asarray(
+            self.config["hourly_demand_kgph"],
+            dtype=float
+        )
 
+        annual_demand_kg = float(
+            np.sum(demand_kgph)
+        )
+
+        # --------------------------------------------------
+        # H2 production from electrolyser
+        # --------------------------------------------------
         annual_production_kg = 0.0
+
         if self.electrolyser_results:
             annual_production_kg = float(
-                self.electrolyser_results.get("totals", {}).get("H2_kg", 0.0)
+                self.electrolyser_results
+                .get("totals", {})
+                .get("H2_kg", 0.0)
             )
 
-        surplus_deficit_kg = annual_production_kg - annual_demand_kg
-        is_sufficient = annual_production_kg >= annual_demand_kg
+        # --------------------------------------------------
+        # H2 supply available to downstream system
+        # --------------------------------------------------
+        annual_supply_kg = float(
+            np.sum(self.h2_supply_kgph)
+        )
+
+        # --------------------------------------------------
+        # Supply vs demand
+        # --------------------------------------------------
+        surplus_deficit_kg = (
+            annual_supply_kg - annual_demand_kg
+        )
+
+        is_sufficient = (
+            annual_supply_kg >= annual_demand_kg
+        )
 
         if is_sufficient:
             message = (
-                f"Annual hydrogen production is sufficient. "
+                f"Annual hydrogen supply is sufficient. "
                 f"Produced = {annual_production_kg:,.2f} kg/year, "
+                f"supply = {annual_supply_kg:,.2f} kg/year, "
                 f"demand = {annual_demand_kg:,.2f} kg/year, "
                 f"surplus = {surplus_deficit_kg:,.2f} kg/year."
             )
+
         else:
             message = (
-                f"Annual hydrogen production is not sufficient. "
+                f"Annual hydrogen supply is not sufficient. "
                 f"Produced = {annual_production_kg:,.2f} kg/year, "
+                f"supply = {annual_supply_kg:,.2f} kg/year, "
                 f"demand = {annual_demand_kg:,.2f} kg/year, "
                 f"deficit = {abs(surplus_deficit_kg):,.2f} kg/year."
             )
 
         return {
             "annual_production_kg": annual_production_kg,
-            "annual_supply_kg": annual_production_kg,
+            "annual_supply_kg": annual_supply_kg,
             "annual_demand_kg": annual_demand_kg,
             "surplus_deficit_kg": surplus_deficit_kg,
             "is_sufficient": is_sufficient,
@@ -1186,7 +1306,14 @@ class HyTEACore:
         self.setup_electrolyser()
         self.run_electrolyser()
         self.validate_energy_balance()
-        self.run_storage()
+        # Run hydrogen storage only if enabled
+        if self.config.get("use_storage", True):
+            self.run_storage()
+        else:
+            self.storage_model = None
+            self.storage_results = {}
+        # Build common H2 supply stream
+        self.build_h2_supply()
         self.run_transport()
         self.run_economics()
         annual_balance_results = self.check_annual_h2_balance()
