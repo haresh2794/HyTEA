@@ -3,7 +3,7 @@ import pandas as pd
 import matplotlib.pyplot as plt
 
 
-def plot_rese_power(
+def rese_plots(
     rese_df=None,
     rese_results=None,
     source_columns=None,
