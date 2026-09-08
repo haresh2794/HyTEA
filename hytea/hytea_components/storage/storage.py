@@ -269,10 +269,19 @@ class HydrogenStorage:
         prod_tph = prod_kgph / 1000.0
         cumulative_production_t = np.cumsum(prod_tph)
 
-        self.required_initial_storage_kg = -float(np.min(cumulative_additions_kg)) * fos
+        self.required_initial_storage_kg = max(
+            0.0,
+            -float(np.min(cumulative_additions_kg)) * fos
+        )
 
-        ideal_storage_curve_kg = self.required_initial_storage_kg + cumulative_additions_kg
-        self.required_capacity_kg = float(np.max(ideal_storage_curve_kg))
+        ideal_storage_curve_kg = (
+            self.required_initial_storage_kg + cumulative_additions_kg
+        )
+
+        self.required_capacity_kg = max(
+            self.required_initial_storage_kg,
+            float(np.max(ideal_storage_curve_kg))
+        )
 
         # ---------- Capacimiytty selection ----------
         opt = str(self.storage_sizing_option).strip().lower()
@@ -293,10 +302,17 @@ class HydrogenStorage:
         else:
             raise ValueError(f"Unknown storage_sizing_option: {self.storage_sizing_option}")
 
-        # Ensure capacity >= required initial buffer
-        if capacity_kg < self.required_initial_storage_kg:
-            print("Storage insufficient: capacity < required initial buffer. Adjusting to required initial.")
-            capacity_kg = self.required_initial_storage_kg
+        if capacity_kg < self.required_capacity_kg:
+            print(
+                f"Warning: selected storage capacity ({capacity_kg:.2f} kg) "
+                f"is smaller than the required storage capacity "
+                f"({self.required_capacity_kg:.2f} kg). "
+                f"A storage capacity of at least "
+                f"{self.required_capacity_kg:.2f} kg "
+                f"({self.required_capacity_kg / 1000:.2f} tonnes) "
+                f"would be required to fully satisfy the demand."
+            )
+
         
         cap_t = capacity_kg / 1000.0
 
@@ -333,9 +349,9 @@ class HydrogenStorage:
         # ----------Total Storage CAPEX calculation ----------
 
         if self.com_liq_included:
-            self.total_storage_capex = self.storage_specific_capex * capacity_kg*self.fos - self.total_compressor_capex
+            self.total_storage_capex = self.storage_specific_capex * capacity_kg - self.total_compressor_capex
         else:
-            self.total_storage_capex = self.storage_specific_capex * capacity_kg*self.fos
+            self.total_storage_capex = self.storage_specific_capex * capacity_kg
 
         
         #------------Storage OPEX calculation--------------
@@ -410,10 +426,12 @@ class HydrogenStorage:
             d = demand_tph[t]
 
             # Production -> Storage first
-            if s_start + p > cap_t*self.fos:
-                prod_to_storage_tph[t] = cap_t - s_start
-            else:
-                prod_to_storage_tph[t] = p
+            available_capacity_t = max(0.0, cap_t - s_start)
+
+            prod_to_storage_tph[t] = min(
+                p,
+                available_capacity_t
+            )
 
             # Production -> Demand gets the remainder
             prod_to_demand_tph[t] = p - prod_to_storage_tph[t]
