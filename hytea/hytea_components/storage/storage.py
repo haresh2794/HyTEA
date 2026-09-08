@@ -316,42 +316,51 @@ class HydrogenStorage:
         
         cap_t = capacity_kg / 1000.0
 
-
-      
-        # ----------spec Storage CAPEX calculation ----------
-        if self.custom_specific_capex is not None:
-            self.storage_specific_capex = self.custom_specific_capex
-
-        elif self.storage_method == "Liquid H2":
-            self.storage_specific_capex = self._capex_liquid_h2(capacity_kg)
-
-        else:
-            self.storage_specific_capex = self._capex_ab_scaling(capacity_kg)
-
         
-        max_hourly_prod_kgph = np.max(prod_kgph)
+        if capacity_kg <= 0:
 
+            # No physical storage system
+            self.storage_specific_capex = 0.0
+            self.total_storage_capex = 0.0
 
+            self.compressor_specific_capex = 0.0
+            self.total_compressor_capex = 0.0
 
-        # ---------- Compressor / Liquefaction CAPEX ----------
-        if self.storage_method == "Liquid H2":
-            #calculated differently
-           
-            compressor_spec_capex = 0.9*35280.8215583011*max_hourly_prod_kgph**(-0.197333784307813)
         else:
+            # ----------spec Storage CAPEX calculation ----------
+            if self.custom_specific_capex is not None:
+                self.storage_specific_capex = self.custom_specific_capex
+
+            elif self.storage_method == "Liquid H2":
+                self.storage_specific_capex = self._capex_liquid_h2(capacity_kg)
+
+            else:
+                self.storage_specific_capex = self._capex_ab_scaling(capacity_kg)
+
             
-            compressor_spec_capex = self._calc_compressor_spec_capex(self.pout_bar,max_hourly_prod_kgph)
+            max_hourly_prod_kgph = np.max(prod_kgph)
 
 
-        self.compressor_specific_capex = compressor_spec_capex
-        self.total_compressor_capex = compressor_spec_capex * max_hourly_prod_kgph
 
-        # ----------Total Storage CAPEX calculation ----------
+            # ---------- Compressor / Liquefaction CAPEX ----------
+            if self.storage_method == "Liquid H2":
+                #calculated differently
+            
+                compressor_spec_capex = 0.9*35280.8215583011*max_hourly_prod_kgph**(-0.197333784307813)
+            else:
+                
+                compressor_spec_capex = self._calc_compressor_spec_capex(self.pout_bar,max_hourly_prod_kgph)
 
-        if self.com_liq_included:
-            self.total_storage_capex = self.storage_specific_capex * capacity_kg - self.total_compressor_capex
-        else:
-            self.total_storage_capex = self.storage_specific_capex * capacity_kg
+
+            self.compressor_specific_capex = compressor_spec_capex
+            self.total_compressor_capex = compressor_spec_capex * max_hourly_prod_kgph
+
+            # ----------Total Storage CAPEX calculation ----------
+
+            if self.com_liq_included:
+                self.total_storage_capex = self.storage_specific_capex * capacity_kg - self.total_compressor_capex
+            else:
+                self.total_storage_capex = self.storage_specific_capex * capacity_kg
 
         
         #------------Storage OPEX calculation--------------
@@ -412,13 +421,29 @@ class HydrogenStorage:
         boil_off_t = np.zeros(n)
         
 
-        # ---------- Starting storage t=0  ----------
+        
+        # ---------- Starting storage t=0 ----------
         start_opt = str(self.starting_storage_option).strip().lower()
+
         if start_opt == "full storage":
-            starting_storage_t[0] = req_init_t
+            # Start with the actual selected physical storage capacity
+            starting_storage_t[0] = cap_t
+
         else:
-            # Hours option: hours * demand_per_hour * fos
-            starting_storage_t[0] = float(self.starting_storage_hours) * demand_tph[0] * fos
+            # Hours option
+            starting_storage_t[0] = (
+                float(self.starting_storage_hours)
+                * demand_tph[0]
+                * fos
+            )
+
+        # Starting inventory cannot exceed physical storage capacity
+        if starting_storage_t[0] > cap_t:
+            raise ValueError(
+                f"Starting storage ({starting_storage_t[0]:.3f} t) "
+                f"exceeds storage capacity ({cap_t:.3f} t). "
+                "Increase storage capacity or reduce starting_storage_hours."
+            )
 
         # ---------- Chain simulation ----------
         for t in range(n):
@@ -443,10 +468,16 @@ class HydrogenStorage:
             
 
             # Storage -> Demand 
-            if s_start - demand_remaining_tph[t] > minimum_h2_stored_t:
-                storage_to_demand_tph[t] = demand_remaining_tph[t]
-            else:
-                storage_to_demand_tph[t] = min(demand_remaining_tph[t],s_start - minimum_h2_stored_t) #====CORRECTED after TEST 6 ====================================================================================
+            # Storage -> Demand
+            available_storage_t = max(
+                0.0,
+                s_start - minimum_h2_stored_t
+            )
+
+            storage_to_demand_tph[t] = min(
+                demand_remaining_tph[t],
+                available_storage_t
+            ) #====CORRECTED after TEST 6 ====================================================================================
 
             # Supply
             supply_tph[t] = prod_to_demand_tph[t] + storage_to_demand_tph[t]
