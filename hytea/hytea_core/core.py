@@ -57,6 +57,12 @@ class HyTEACore:
         # Common hourly H2 supply stream used by downstream components
         self.h2_supply_kgph = np.array([])
 
+        # No-storage demand check
+        self.no_storage_h2_deficit_kgph = np.array([])
+        self.no_storage_h2_surplus_kgph = np.array([])
+        self.no_storage_total_h2_deficit_kg = 0.0
+        self.no_storage_demand_fulfilled = True
+
         self.transport_model = None
         self.transport_results = {}
 
@@ -551,7 +557,6 @@ class HyTEACore:
                 dtype=float
             )
 
-            # Storage supply is tonnes/hour
             self.h2_supply_kgph = supply_tph * 1000.0
 
         else:
@@ -561,8 +566,67 @@ class HyTEACore:
                 dtype=float
             )
 
+            self.check_h2_demand_when_no_storage()
+
         return self.h2_supply_kgph
     
+
+    def check_h2_demand_when_no_storage(self):
+
+        demand = np.asarray(
+            self.config["hourly_demand_kgph"],
+            dtype=float
+        )
+
+        supply = np.asarray(
+            self.h2_supply_kgph,
+            dtype=float
+        )
+
+        # Hourly H2 deficit
+        self.no_storage_h2_deficit_kgph = np.maximum(
+            demand - supply,
+            0.0
+        )
+
+        # Hourly H2 surplus
+        self.no_storage_h2_surplus_kgph = np.maximum(
+            supply - demand,
+            0.0
+        )
+
+        # Total annual deficit
+        self.no_storage_total_h2_deficit_kg = float(
+            np.sum(self.no_storage_h2_deficit_kgph)
+        )
+
+        # Demand fulfilment
+        self.no_storage_demand_fulfilled = (
+            self.no_storage_total_h2_deficit_kg <= 1e-9
+        )
+
+        if self.no_storage_demand_fulfilled:
+            print("H₂ demand fulfilled.")
+        else:
+            print(
+                f"WARNING: H₂ demand not fulfilled. "
+                f"Total deficit = "
+                f"{self.no_storage_total_h2_deficit_kg:,.2f} kg."
+            )
+
+        return {
+            "no_storage_demand_fulfilled":
+                self.no_storage_demand_fulfilled,
+
+            "no_storage_total_h2_deficit_kg":
+                self.no_storage_total_h2_deficit_kg,
+
+            "no_storage_h2_deficit_kgph":
+                self.no_storage_h2_deficit_kgph,
+
+            "no_storage_h2_surplus_kgph":
+                self.no_storage_h2_surplus_kgph,
+        }
     #============================================================================================================================================================================================
     # TRANSPORT
     #==============================================================================================================================================================================================
@@ -1333,5 +1397,9 @@ class HyTEACore:
             "discounting_results": self.discounting_results,
             "levelized_cost_results": self.levelized_cost_results,
             "annual_balance_results": annual_balance_results,
+            "no_storage_demand_fulfilled": self.no_storage_demand_fulfilled,
+            "no_storage_total_h2_deficit_kg": self.no_storage_total_h2_deficit_kg,
+            "no_storage_h2_deficit_kgph":self.no_storage_h2_deficit_kgph,
+            "no_storage_h2_surplus_kgph":self.no_storage_h2_surplus_kgph,
             
         }
