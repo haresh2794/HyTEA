@@ -404,6 +404,7 @@ class HydrogenStorage:
 
         prod_to_storage_tph = np.zeros(n)
         prod_to_demand_tph = np.zeros(n)
+        demand_remaining_tph = np.zeros(n)
         shortfall_tph = np.zeros(n)
         storage_to_demand_tph = np.zeros(n)
         supply_tph = np.zeros(n)
@@ -437,18 +438,20 @@ class HydrogenStorage:
             prod_to_demand_tph[t] = p - prod_to_storage_tph[t]
 
             # Demand shortfall
-            shortfall_tph[t] = max(0.0, d - prod_to_demand_tph[t])
+            demand_remaining_tph[t] = max(0.0, d - prod_to_demand_tph[t])
 
             
 
             # Storage -> Demand 
-            if s_start - shortfall_tph[t] > minimum_h2_stored_t:
-                storage_to_demand_tph[t] = shortfall_tph[t]
+            if s_start - demand_remaining_tph[t] > minimum_h2_stored_t:
+                storage_to_demand_tph[t] = demand_remaining_tph[t]
             else:
-                storage_to_demand_tph[t] = min(shortfall_tph[t],s_start - minimum_h2_stored_t) #====CORRECTED after TEST 6 ====================================================================================
+                storage_to_demand_tph[t] = min(demand_remaining_tph[t],s_start - minimum_h2_stored_t) #====CORRECTED after TEST 6 ====================================================================================
 
             # Supply
             supply_tph[t] = prod_to_demand_tph[t] + storage_to_demand_tph[t]
+
+            shortfall_tph[t] = max( 0.0, d - supply_tph[t])
 
             # Actual storage 
             pre_boil = s_start + prod_to_storage_tph[t] - storage_to_demand_tph[t]
