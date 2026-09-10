@@ -208,7 +208,7 @@ class HydrogenStorage:
         self.storage_capacity_tonnes = None if cap_t is None else float(cap_t)
         self.fos = float(cfg.get("fos", 1.1))
         self.p_in_bar = cfg.get("p_in_bar", 15)
-        self.energy_cost = cfg.get("energy_cost", 0.25) # €/kWh
+        self.energy_cost = cfg.get("energy_cost", 0.10) # €/kWh
         self.pout_bar = cfg.get("pout_bar", defaults["pressure_bar"])
 
         self.com_liq_included = cfg.get("com_liq_included", defaults["com_liq_included"])
@@ -371,7 +371,7 @@ class HydrogenStorage:
                 self.storage_specific_capex = self._capex_ab_scaling(capacity_kg)
 
             
-
+            """
             # ----------Total Storage CAPEX calculation ----------
 
             if self.com_liq_included:
@@ -379,7 +379,8 @@ class HydrogenStorage:
             else:
                 self.total_storage_capex = self.storage_specific_capex * capacity_kg
 
-        
+            """
+        """
         #------------Storage OPEX calculation--------------
         if self.storage_method == "Liquid H2":
 
@@ -389,7 +390,7 @@ class HydrogenStorage:
         else:
             self.total_storage_opex = self.total_storage_capex*0.02 #+ self.sec_compressor*self.energy_cost*sum(prod_kgph)
         
-
+        """
 
 
 
@@ -523,7 +524,7 @@ class HydrogenStorage:
             if t < n - 1:
                 starting_storage_t[t + 1] = s_end
         
-
+        """
         # ---------- Compressor / Liquefaction CAPEX ----------
         max_hourly_storage_inflow_kgph = np.max(prod_to_storage_tph) * 1000.0
 
@@ -549,17 +550,85 @@ class HydrogenStorage:
         else:
             self.compressor_specific_capex = 0.0
             self.total_compressor_capex = 0.0
+        """
+        # ---------- Compressor / Liquefaction CAPEX ----------
+
+        # Compressor is upstream of the split between demand and storage.
+        # Therefore, both production -> demand and production -> storage
+        # pass through the compressor.
+
+        max_compression_flow_kgph = np.max(
+            (prod_to_demand_tph + prod_to_storage_tph) * 1000.0
+        )
+        compressed_kgph = (
+            prod_to_demand_tph + prod_to_storage_tph
+        ) * 1000.0
+
+        annual_compressed_h2_kg = np.sum(compressed_kgph)
+
+        if max_compression_flow_kgph > 0:
+
+            if self.storage_method == "Liquid H2":
+
+                compressor_spec_capex = (
+                    0.9
+                    * 35280.8215583011
+                    * max_compression_flow_kgph ** (-0.197333784307813)
+                )
+
+            else:
+
+                compressor_spec_capex = self._calc_compressor_spec_capex(
+                    self.pout_bar,
+                    max_compression_flow_kgph
+                )
+
+            self.compressor_specific_capex = compressor_spec_capex
+
+            self.total_compressor_capex = (
+                compressor_spec_capex * max_compression_flow_kgph
+            )
+
+        else:
+
+            self.compressor_specific_capex = 0.0
+            self.total_compressor_capex = 0.0
 
 
+        # ---------- Total Storage CAPEX calculation ----------
+
+        if capacity_kg <= 0:
+
+            self.total_storage_capex = 0.0
+
+        elif self.com_liq_included:
+
+            self.total_storage_capex = (
+                self.storage_specific_capex * capacity_kg
+                - self.total_compressor_capex
+            )
+
+        else:
+
+            self.total_storage_capex = (
+                self.storage_specific_capex * capacity_kg
+            )
         #------------Compressor OPEX calculation--------------
 
         if self.storage_method == "Liquid H2":
 
             #calculated differently
-            self.total_compressor_opex = self.total_compressor_capex*0.02 #+ self.liq_storage_sec*self.energy_cost*sum(prod_kgph)
+            self.total_compressor_opex = self.total_compressor_capex*0.02 + self.liq_storage_sec*self.energy_cost*annual_compressed_h2_kg
             
         else:
-            self.total_compressor_opex = self.total_compressor_capex*0.02 #+ self.sec_compressor*self.energy_cost*sum(prod_kgph)
+            self.total_compressor_opex = self.total_compressor_capex*0.02 + self.sec_compressor*self.energy_cost*annual_compressed_h2_kg
+        
+
+        # ------------ Storage OPEX calculation ------------
+
+        self.total_storage_opex = (
+            self.total_storage_capex * 0.02
+        )
 
         # ---------- Derived inventories for reporting ----------
         storage_no_init_kg = cumulative_additions_kg
