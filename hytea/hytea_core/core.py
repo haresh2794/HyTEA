@@ -742,10 +742,6 @@ class HyTEACore:
         2. storage cumulative supply
         3. electrolyser total H2
         """
-        if self.transport_results:
-            val = float(self.transport_results.get("total_annual_h2_transported_kg", 0.0))
-            if val > 0:
-                return val
 
         if self.storage_results:
             cum_supply_t = np.asarray(
@@ -754,11 +750,20 @@ class HyTEACore:
             )
             if cum_supply_t.size > 0:
                 return float(cum_supply_t[-1] * 1000.0)
-
+            
         if self.electrolyser_results:
             return float(self.electrolyser_results["totals"].get("H2_kg", 0.0))
 
+        if self.transport_results:
+            val = float(self.transport_results.get("total_annual_h2_transported_kg", 0.0))
+            if val > 0:
+                return val
+
+
+
         return 0.0
+
+ 
     
     
     # Get annual h2 produced
@@ -971,7 +976,24 @@ class HyTEACore:
             + water_opex
         )
 
-        annual_h2_kg = self._get_annual_h2_for_lcoh() #Get annual h2 produced else if the delivered is required use _get_annual_h2_delivered_basis()
+        lcoh_basis = self.config.get("economics", {}).get(
+            "h2_lcoh_basis",
+            "produced"
+        ).lower()
+
+        if lcoh_basis == "produced":
+            annual_h2_kg = self._get_annual_h2_for_lcoh()
+
+        elif lcoh_basis == "delivered":
+            annual_h2_kg = self._get_annual_h2_delivered_basis()
+
+        else:
+            raise ValueError(
+                "Invalid 'h2_lcoh_basis'. "
+                "Choose either 'produced' or 'delivered'."
+            )
+
+        #annual_h2_kg = self._get_annual_h2_for_lcoh() #Get annual h2 produced else if the delivered is required use _get_annual_h2_delivered_basis()
 
         breakdown = { #TEST 11 - PENDING
             "capex": {
@@ -1221,12 +1243,13 @@ class HyTEACore:
 
         if self.config.get("integrate_grid", False):
 
-            # Energy actually used by electrolyser from grid (kWh)
             grid_energy_kWh = np.asarray(
-                self.electrolyser_results["streams_energy_used_kWh"].get("grid", np.zeros(8760)),
+                self.electrolyser_results
+                .get("streams", {})
+                .get("grid", {})
+                .get("energy_used_kWh", np.zeros(8760)),
                 dtype=float
             )
-
             # Grid GHG intensity (gCO2/kWh)
             grid_ghg_intensity = np.asarray(
                 self.grid_summary.get("hourly_ghg_trend", np.zeros_like(grid_energy_kWh)),
@@ -1380,6 +1403,7 @@ class HyTEACore:
         self.build_h2_supply()
         self.run_transport()
         self.run_economics()
+        ghg_results = self.calculate_ghg_intensity()
         annual_balance_results = self.check_annual_h2_balance()
 
         return {
@@ -1388,6 +1412,7 @@ class HyTEACore:
             "aggregated_results": self.aggregated_results,
             "grid_results": self.grid_results,
             "grid_summary": self.grid_summary,
+            "ghg_results": ghg_results,
             "power_df": self.power_df,
             "grid_stream_kW": self.grid_stream_kW,
             "electrolyser_results": self.electrolyser_results,
