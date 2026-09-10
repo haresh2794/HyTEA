@@ -610,7 +610,7 @@ class HyTEACore:
         else:
             print(
                 f"WARNING: H₂ demand not fulfilled. "
-                f"Total deficit = "
+                f"Total annual deficit = "
                 f"{self.no_storage_total_h2_deficit_kg:,.2f} kg."
             )
 

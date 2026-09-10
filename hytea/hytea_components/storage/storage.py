@@ -362,7 +362,8 @@ class HydrogenStorage:
 
         
         req_init_t = self.required_initial_storage_kg / 1000.0
-        minimum_h2_stored_t = np.min(np.minimum(ideal_storage_curve_kg, demand_kgph)) / 1000
+        
+        #minimum_h2_stored_t = np.min(np.minimum(ideal_storage_curve_kg, demand_kgph)) / 1000
 
         """
         TEST 6 ISSUE
@@ -427,16 +428,22 @@ class HydrogenStorage:
             p = prod_tph[t]
             d = demand_tph[t]
 
-            # Production -> Storage first
-            available_capacity_t = max(0.0, cap_t - s_start)
+            # Production -> Storage first REPLACED
+            # Production -> Demand first
+            prod_to_demand_tph[t] = min(p, d)
 
-            prod_to_storage_tph[t] = min(
-                p,
-                available_capacity_t
+            # Production surplus -> Storage
+            surplus_tph = max(0.0, p - prod_to_demand_tph[t])
+
+            available_capacity_t = max(
+                0.0,
+                cap_t - s_start
             )
 
-            # Production -> Demand gets the remainder
-            prod_to_demand_tph[t] = p - prod_to_storage_tph[t]
+            prod_to_storage_tph[t] = min(
+                surplus_tph,
+                available_capacity_t
+            )
 
             # Demand shortfall
             demand_remaining_tph[t] = max(0.0, d - prod_to_demand_tph[t])
@@ -447,13 +454,15 @@ class HydrogenStorage:
             # Storage -> Demand
             available_storage_t = max(
                 0.0,
-                s_start - minimum_h2_stored_t
+                s_start
             )
 
             storage_to_demand_tph[t] = min(
                 demand_remaining_tph[t],
                 available_storage_t
-            ) #====CORRECTED after TEST 6 ====================================================================================
+            ) 
+            #Changed after minimum storage issue
+            #====INVALID Correction CORRECTED after TEST 6 ====================================================================================
 
             # Supply
             supply_tph[t] = prod_to_demand_tph[t] + storage_to_demand_tph[t]
@@ -463,7 +472,7 @@ class HydrogenStorage:
             # Actual storage 
             pre_boil = s_start + prod_to_storage_tph[t] - storage_to_demand_tph[t]
             boil_off_t[t] = pre_boil * boil_frac_per_hour
-            s_end = pre_boil - boil_off_t[t]
+            s_end = max(0.0,pre_boil - boil_off_t[t])
 
             actual_storage_t[t] = s_end
 

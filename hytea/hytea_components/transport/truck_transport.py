@@ -428,10 +428,24 @@ class HydrogenTruckTransport:
             # Booster CAPEX only if P2 > P1
             if self.P2_bar > self.P1_bar:
 
-                capex_P2 = self._calc_compressor_spec_capex(self.P2_bar)
-                capex_P1 = self._calc_compressor_spec_capex(self.P1_bar)
+                if self.P1_bar > self.P0_bar:
+                    # Storage ON:
+                    # Compressor 1: P0 → P1 is handled by storage
+                    # Compressor 2: P1 → P2 is the transport booster
 
-                self.boost_spec_capex = capex_P2 - capex_P1
+                    capex_P2 = self._calc_compressor_spec_capex(self.P2_bar)
+                    capex_P1 = self._calc_compressor_spec_capex(self.P1_bar)
+
+                    self.boost_spec_capex = capex_P2 - capex_P1
+
+                else:
+                    # Storage OFF:
+                    # P1 = P0, so there is no first compression stage.
+                    # Transport compressor must do the full P0 → P2 compression.
+
+                    self.boost_spec_capex = self._calc_compressor_spec_capex(
+                        self.P2_bar
+                    )
 
             else:
                 self.boost_spec_capex = 0
