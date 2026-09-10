@@ -308,17 +308,43 @@ class HydrogenStorage:
 
         else:
             raise ValueError(f"Unknown storage_sizing_option: {self.storage_sizing_option}")
+        
 
         if capacity_kg < self.required_capacity_kg:
-            print(
-                f"Warning: selected storage capacity ({capacity_kg:.2f} kg) "
-                f"is smaller than the required storage capacity "
-                f"({self.required_capacity_kg:.2f} kg). "
-                f"A storage capacity of at least "
-                f"{self.required_capacity_kg:.2f} kg "
-                f"({self.required_capacity_kg / 1000:.2f} tonnes) "
-                f"would be required to fully satisfy the demand."
-            )
+
+            if self.required_initial_storage_kg > 0:
+                warning_message = (
+                    f"Warning: selected storage capacity ({capacity_kg:.2f} kg) "
+                    f"is smaller than the required storage capacity "
+                    f"({self.required_capacity_kg:.2f} kg). "
+                    f"The required initial storage is "
+                    f"{self.required_initial_storage_kg:.2f} kg "
+                    f"({self.required_initial_storage_kg / 1000:.2f} tonnes). "
+                    f"A storage capacity of at least "
+                    f"{self.required_capacity_kg:.2f} kg "
+                    f"({self.required_capacity_kg / 1000:.2f} tonnes) "
+                    f"would be required to fully satisfy the demand."
+                )
+
+            else:
+                warning_message = (
+                    f"Warning: selected storage capacity ({capacity_kg:.2f} kg) "
+                    f"is smaller than the required storage capacity "
+                    f"({self.required_capacity_kg:.2f} kg). "
+                    f"The selected storage "
+                    f"capacity is insufficient to store the full production surplus. "
+                    f"Some surplus hydrogen may therefore be curtailed. "
+                    f"A storage capacity of at least "
+                    f"{self.required_capacity_kg:.2f} kg "
+                    f"({self.required_capacity_kg / 1000:.2f} tonnes) "
+                    f"would be required to store the full surplus."
+                )
+
+            print(warning_message)
+
+        else:
+            warning_message = None
+
 
         
         cap_t = capacity_kg / 1000.0
@@ -611,6 +637,7 @@ class HydrogenStorage:
             "actual_storage_t": self.actual_storage_t,
             "ideal_storage_t": self.ideal_storage_t,
             "storage_no_init_t": self.storage_no_init_t,
+            "warning": warning_message,
 
             # kg series
             "h2_additions_kgph": self.h2_additions_kgph,
