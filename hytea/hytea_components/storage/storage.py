@@ -48,6 +48,8 @@ class HydrogenStorage:
         # Starting storage policy
         self.starting_storage_option = "Full storage"  # "Full storage" or "Hours"
         self.starting_storage_hours = 0.0              # only used if option == "Hours"
+        # Starting storage
+        self.starting_h2_storage_t = None  # None = start with full storage capacity
 
         # Storage sizing policy (capacity)
         self.storage_sizing_option = "Full storage"    # "Full storage" | "Hours" | "Tonnes"
@@ -212,8 +214,13 @@ class HydrogenStorage:
         self.com_liq_included = cfg.get("com_liq_included", defaults["com_liq_included"])
 
         # Optional: allow starting storage policy to be configured too
-        self.starting_storage_option = cfg.get("starting_storage_option", "Full storage")
-        self.starting_storage_hours = float(cfg.get("starting_storage_hours", 0.0))
+        #self.starting_storage_option = cfg.get("starting_storage_option", "Full storage")
+        #self.starting_storage_hours = float(cfg.get("starting_storage_hours", 0.0))
+        # Optional: actual starting storage in tonnes
+        self.starting_h2_storage_t = cfg.get("starting_h2_storage_t", None)
+
+        if self.starting_h2_storage_t is not None:
+            self.starting_h2_storage_t = float(self.starting_h2_storage_t)
 
         self.sec_compressor = cfg.get("sec_compressor", self.calc_sec_boost(self.pout_bar))
      
@@ -400,6 +407,7 @@ class HydrogenStorage:
 
         
         # ---------- Starting storage t=0 ----------
+        """
         start_opt = str(self.starting_storage_option).strip().lower()
 
         if start_opt == "full storage":
@@ -414,12 +422,21 @@ class HydrogenStorage:
                 * fos
             )
 
-        # Starting inventory cannot exceed physical storage capacity
+        """
+        # ---------- Starting storage t=0 ----------
+        if self.starting_h2_storage_t is None:
+            # Default: start with full storage capacity
+            starting_storage_t[0] = cap_t
+        else:
+            # User-defined actual starting storage
+            starting_storage_t[0] = self.starting_h2_storage_t
+
+                # Starting inventory cannot exceed physical storage capacity
         if starting_storage_t[0] > cap_t:
             raise ValueError(
                 f"Starting storage ({starting_storage_t[0]:.3f} t) "
                 f"exceeds storage capacity ({cap_t:.3f} t). "
-                "Increase storage capacity or reduce starting_storage_hours."
+                "Increase storage capacity or reduce starting_h2_storage_t."
             )
 
         # ---------- Chain simulation ----------
