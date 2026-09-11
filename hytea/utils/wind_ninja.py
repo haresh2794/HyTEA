@@ -1,7 +1,7 @@
 import os
 import requests
 import pandas as pd
-
+from .documentation.wind_ninja_doc import WIND_CF_DOC
 
 def generate_wind_cf_from_location(
     lat,
@@ -17,50 +17,7 @@ def generate_wind_cf_from_location(
     save_plot=False,
     plot_file="plots/wind_cf_plot.png",
 ):
-    """
-    Fetch hourly wind capacity factor data from Renewables Ninja
-    and save it as a CSV file with columns: hour, cf.
-
-    Optional:
-    - plot_cf=True   -> create a plot
-    - save_plot=True -> save the plot image
-
-    Parameters
-    ----------
-    lat : float
-        Latitude.
-    lon : float
-        Longitude.
-    output_file : str, optional
-        Path to save the CSV file.
-    token : str, optional
-        Renewables Ninja API token.
-    date_from : str, optional
-        Start date in YYYY-MM-DD format.
-    date_to : str, optional
-        End date in YYYY-MM-DD format.
-    height : float, optional
-        Hub height in meters.
-    turbine : str, optional
-        Turbine model name supported by Renewables Ninja.
-    verbose : bool, optional
-        Whether to print progress messages.
-    plot_cf : bool, optional
-        Whether to generate a CF plot.
-    save_plot : bool, optional
-        Whether to save the CF plot.
-    plot_file : str, optional
-        Path to save the plot image.
-
-
-
-        
-
-    Returns
-    -------
-    str
-        Path to generated CSV file.
-    """
+    generate_wind_cf_from_location.__doc__ = WIND_CF_DOC
 
     if token is None:
         raise ValueError("Renewables Ninja API token required")

@@ -17,7 +17,7 @@ class Grid:
         self.ratios = [0]                 # ratio between CFs
         self.avg_grid_price = 100         # €/MWh
         self.difference = 50              # €/MWh
-        self.ghg_avg = 300                # gCO2/kWh
+        self.ghg_avg = 234                # gCO2/kWh
         self.peak_hours = (17, 18)        # zero-based hour indices
 
         # Computed attributes (filled on evaluate)
