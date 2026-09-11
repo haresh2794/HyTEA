@@ -2,6 +2,7 @@ import os
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
+from .documentation.demand_profile_doc import DEMAND_PROFILE_DOC
 
 
 def load_demand_profile(
@@ -12,20 +13,7 @@ def load_demand_profile(
     save_plot=False,
     plot_file="plots/demand_profile.png"
 ):
-    """
-    Load an hourly hydrogen demand profile.
-
-    If use_demand_file=False:
-        Uses a constant hourly demand.
-
-    If use_demand_file is a CSV path:
-        Loads the hourly demand profile from that CSV file.
-
-    Returns
-    -------
-    np.ndarray
-        8760-hour demand profile in kg/h.
-    """
+    load_demand_profile.__doc__ = DEMAND_PROFILE_DOC
 
     # ==========================================================
     # USER-PROVIDED CSV PROFILE

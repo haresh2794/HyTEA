@@ -1,7 +1,7 @@
 import os
 import pandas as pd
 import matplotlib.pyplot as plt
-
+from .documentation.plot_resepw_doc import RESE_PLOTS_DOC
 
 def rese_plots(
     rese_df=None,
@@ -15,80 +15,7 @@ def rese_plots(
     plot_file=None,
     show_plot=True
 ):
-    """
-    Plot renewable electricity generation as a stacked area chart.
-
-    Parameters
-    ----------
-    rese_df : pandas.DataFrame, optional
-        Hourly renewable electricity generation dataframe.
-        Required when plot_type="hourly".
-
-    rese_results : dict, optional
-        Renewable source results returned by run_rese_sources().
-        Required when plot_type="cumulative".
-
-        Expected structure:
-
-        {
-            "wind_1": {
-                "hourly_output_mw": ...,
-                "cumulative_energy_gwh_total": ...,
-                "cumulative_energy_gwh_hourly": ...
-            },
-            "solar_1": {
-                "hourly_output_mw": ...,
-                "cumulative_energy_gwh_total": ...,
-                "cumulative_energy_gwh_hourly": ...
-            }
-        }
-
-    source_columns : list, optional
-        Sources to include in the plot.
-
-        For plot_type="hourly", these should be columns
-        in rese_df.
-
-        For plot_type="cumulative", these should be keys
-        in rese_results.
-
-        If None, all available renewable sources are plotted.
-
-    plot_type : {"hourly", "cumulative"}, default="hourly"
-        Type of plot:
-
-        "hourly"
-            Hourly renewable electricity generation (MW).
-
-        "cumulative"
-            Cumulative renewable energy generation (GWh).
-
-    start_hour : int, default=1
-        First hour to plot.
-
-    end_hour : int, optional
-        Last hour to plot.
-        If None, all available hours are plotted.
-
-    plot_title : str, optional
-        Plot title.
-        If None, a default title is generated based on plot_type.
-
-    save_plot : bool, default=False
-        If True, save the figure.
-
-    plot_file : str, optional
-        Output file path.
-        If None, a default filename is generated.
-
-    show_plot : bool, default=True
-        If True, display the figure.
-
-    Returns
-    -------
-    matplotlib.figure.Figure
-        Generated figure.
-    """
+    rese_plots.__doc__ = RESE_PLOTS_DOC
 
     # =========================================================
     # Validate plot type
@@ -181,6 +108,8 @@ def rese_plots(
             pd.to_numeric,
             errors="coerce"
         ).fillna(0)
+
+        plot_df = plot_df / 1000
 
         # -----------------------------------------------------
         # Check source values

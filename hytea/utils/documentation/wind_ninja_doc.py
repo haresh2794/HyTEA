@@ -25,10 +25,16 @@ WIND_CF_DOC = """
 
         Example
         -------
+
+        from hytea.utils import generate_wind_cf_from_location
+
         generate_wind_cf_from_location(
             lat=53.27,
             lon=-9.05,
-            token="YOUR_RENEWABLES_NINJA_TOKEN"
+            token="YOUR_RENEWABLES_NINJA_TOKEN",
+            plot_cf=True,
+            save_plot=True,
+            plot_file=f"plots/wind_cf.png"
          )
 
         Parameters

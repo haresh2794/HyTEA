@@ -1,7 +1,7 @@
 import os
 import requests
 import pandas as pd
-
+from .documentation.solar_ninja_doc import SOLAR_CF_DOC
 
 def generate_solar_cf_from_location(
     lat,
@@ -20,10 +20,7 @@ def generate_solar_cf_from_location(
     save_plot=False,
     plot_file="plots/solar_cf_plot.png",
 ):
-    """
-    Fetch hourly solar PV capacity factor data from Renewables Ninja
-    and save it as a CSV file with columns: hour, cf.
-    """
+    generate_solar_cf_from_location.__doc__ = SOLAR_CF_DOC
 
     if token is None:
         raise ValueError("Renewables Ninja API token required")
