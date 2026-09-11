@@ -1,6 +1,6 @@
 import matplotlib.pyplot as plt
 import os
-from documentation.plots_storage_doc import SOLAR_CF_DOC
+from documentation.plots_storage_doc import STORAGE_PLOTS_DOC
 
 def storage_plots(
     storage_results,
@@ -15,7 +15,7 @@ def storage_plots(
     plot_file_prefix="plots/storage"
 ):
     
-    storage_plots.__doc__ = SOLAR_CF_DOC
+    storage_plots.__doc__ = STORAGE_PLOTS_DOC
     # ----------------------------------------------------------
     # Validation
     # ----------------------------------------------------------
