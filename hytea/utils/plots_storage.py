@@ -1,6 +1,6 @@
 import matplotlib.pyplot as plt
 import os
-from documentation.plots_storage_doc import STORAGE_PLOTS_DOC
+from .documentation.plots_storage_doc import STORAGE_PLOTS_DOC
 
 def storage_plots(
     storage_results,
