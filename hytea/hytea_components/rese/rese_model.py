@@ -3,10 +3,10 @@ import yaml
 import numpy as np
 from importlib import resources #allows to access files that are included inside a package.
 
+from .documentation.rese_model_doc import RENEWABLE_ELECTRICITY_DOC
+
 class RenewableElectricity:
-    """RES-E component for HyTEA library:
-    calculates hourly output, cumulative energy, average capacity factor, CAPEX, and OPEX.
-    """
+    
 
     def __init__(self):
         # Core attributes
@@ -128,3 +128,6 @@ class RenewableElectricity:
             "capex": capex,
             "opex": opex,
         }
+
+
+RenewableElectricity.__doc__ = RENEWABLE_ELECTRICITY_DOC

@@ -10,31 +10,10 @@ from hytea.hytea_components.transport.truck_transport import HydrogenTruckTransp
 from hytea.hytea_components.economics.discounting import DiscountingModel
 from hytea.hytea_components.economics.lc import LevelizedCostModel
 
+from .documentation.core_doc import HYTEA_CORE_DOC
 
 class HyTEACore:
-    """
-    HyTEA Core - Version 5
-
-    Responsibilities:
-    - run multiple RESE sources
-    - aggregate RESE outputs
-    - build hourly_cf_mul for Grid
-    - run Grid only if integrated
-    - configure Electrolyser
-    - calculate residual grid stream required to meet electrolyser input capacity
-    - build final stream-wise power DataFrame in kW
-    - run Electrolyser with RESE + optional Grid stream
-    - configure and run Storage using electrolyser outputs
-    - configure and run Transport using storage/electrolyser outputs
-
-    Current scope:
-    - RESE
-    - optional Grid
-    - Electrolyser
-    - Storage
-    - Truck transport
-    - Economics
-    """
+  
     #================
     # 1. Initialize
     #================
@@ -1428,3 +1407,8 @@ class HyTEACore:
             "no_storage_h2_surplus_kgph":self.no_storage_h2_surplus_kgph,
             
         }
+    
+
+HyTEACore.__doc__ = HYTEA_CORE_DOC
+
+

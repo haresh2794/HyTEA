@@ -1,14 +1,10 @@
 import numpy as np
 import yaml
 import math
+from .documentation.truck_transport_doc import HYDROGEN_TRUCK_TRANSPORT_DOC
+
 
 class HydrogenTruckTransport:
-    """
-    Hydrogen terrestrial transport via compressed tube trailer
-    Hourly resolution
-    H2 demand in kg/h per stream
-    Energy in kWh
-    """
 
     def __init__(self):
         # ---------------- Core input parameters ----------------
@@ -593,3 +589,7 @@ class HydrogenTruckTransport:
                 "number_of_fills" : self.number_of_fills,
                 "total_annual_fleet_distance": self.total_annual_fleet_distance
             }
+
+
+
+HydrogenTruckTransport.__doc__ = HYDROGEN_TRUCK_TRANSPORT_DOC

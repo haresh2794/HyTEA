@@ -1,12 +1,8 @@
 import numpy as np
 import yaml
-
+from .documentation.storage_doc import HYDROGEN_STORAGE_DOC
 
 class HydrogenStorage:
-    """
-    Hydrogen storage model with full hourly outputs in tonnes and kg.
-
-    """
 
     def __init__(self):
         # ---------------- Storage Defaults ----------------
@@ -721,3 +717,6 @@ class HydrogenStorage:
         }
 
         return self.outputs
+
+
+HydrogenStorage.__doc__ = HYDROGEN_STORAGE_DOC

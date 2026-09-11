@@ -2,14 +2,10 @@ import numpy as np
 import pandas as pd
 import yaml
 from importlib import resources  # allows access to files included in the package
-
+from .documentation.alk_doc import ALK_ELECTROLYSER_DOC
 
 class ALKElectrolyser:
-    """
-    Single electrolyser fed by multiple energy streams
-    Hourly resolution
-    Power in kW, energy in kWh
-    """
+
 
     def __init__(self):
         self.electro_capacity = None
@@ -524,5 +520,6 @@ class ALKElectrolyser:
 
 
 
+ALKElectrolyser.__doc__ = ALK_ELECTROLYSER_DOC
 
 
