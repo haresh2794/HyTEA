@@ -3,6 +3,8 @@ import pandas as pd
 from copy import deepcopy
 from .documentation.op1_doc import OP1_MIN_ELECTROLYSER_CAPACITY_DOC
 
+from ..hytea_core import HyTEACore
+
 def op1_min_electrolyser_capacity(
     base_config,
     min_capacity=1.0,
