@@ -1,11 +1,13 @@
 import os
+import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
+
 from .documentation.plot_resepw_doc import RESE_PLOTS_DOC
 
+
 def rese_plots(
-    rese_df=None,
-    rese_results=None,
+    rese_results,
     source_columns=None,
     plot_type="hourly",
     start_hour=1,
@@ -15,8 +17,8 @@ def rese_plots(
     plot_file=None,
     show_plot=True
 ):
+    
     rese_plots.__doc__ = RESE_PLOTS_DOC
-
     # =========================================================
     # Validate plot type
     # =========================================================
@@ -27,67 +29,90 @@ def rese_plots(
         )
 
     # =========================================================
+    # Validate results
+    # =========================================================
+
+    if not isinstance(rese_results, dict):
+        raise TypeError(
+            "rese_results must be a dictionary returned by "
+            "run_rese_sources()."
+        )
+
+    if not rese_results:
+        raise ValueError("rese_results is empty.")
+
+    # =========================================================
+    # Select renewable sources
+    # =========================================================
+
+    if source_columns is None:
+        source_columns = list(rese_results.keys())
+    else:
+        source_columns = list(source_columns)
+
+    if not source_columns:
+        raise ValueError("No renewable sources were selected.")
+
+    # =========================================================
+    # Check source names
+    # =========================================================
+
+    missing_sources = [
+        source
+        for source in source_columns
+        if source not in rese_results
+    ]
+
+    if missing_sources:
+        raise ValueError(
+            "Sources not found in rese_results: "
+            f"{missing_sources}"
+        )
+
+    # =========================================================
     # HOURLY PLOT
     # =========================================================
 
     if plot_type == "hourly":
 
         # -----------------------------------------------------
-        # Check input
+        # Check hourly data
         # -----------------------------------------------------
 
-        if not isinstance(rese_df, pd.DataFrame):
-            raise TypeError(
-                "rese_df must be a pandas DataFrame "
-                "when plot_type='hourly'."
+        for source in source_columns:
+
+            if "hourly_output_mw" not in rese_results[source]:
+                raise ValueError(
+                    f"{source} does not contain "
+                    "'hourly_output_mw'."
+                )
+
+        # -----------------------------------------------------
+        # Determine number of hours
+        # -----------------------------------------------------
+
+        n_hours = min(
+            len(
+                rese_results[source]["hourly_output_mw"]
             )
-
-        # -----------------------------------------------------
-        # Select source columns
-        # -----------------------------------------------------
-
-        if source_columns is None:
-            source_columns = rese_df.select_dtypes(
-                include="number"
-            ).columns.tolist()
-
-        if not source_columns:
-            raise ValueError(
-                "No numeric renewable source columns were found."
-            )
-
-        source_columns = list(source_columns)
-
-        # -----------------------------------------------------
-        # Check columns exist
-        # -----------------------------------------------------
-
-        missing_columns = [
-            column
-            for column in source_columns
-            if column not in rese_df.columns
-        ]
-
-        if missing_columns:
-            raise ValueError(
-                f"Columns not found in rese_df: {missing_columns}"
-            )
+            for source in source_columns
+        )
 
         # -----------------------------------------------------
         # Hour range
         # -----------------------------------------------------
 
         if end_hour is None:
-            end_hour = len(rese_df)
+            end_hour = n_hours
 
         if start_hour < 1:
             raise ValueError(
                 "start_hour must be greater than or equal to 1."
             )
 
-        if end_hour > len(rese_df):
+        if end_hour > n_hours:
             raise ValueError(
-                f"end_hour cannot exceed {len(rese_df)}."
+                f"end_hour cannot exceed {n_hours}."
             )
 
         if start_hour > end_hour:
@@ -96,20 +121,19 @@ def rese_plots(
             )
 
         # -----------------------------------------------------
-        # Select data
+        # Build hourly dataframe
         # -----------------------------------------------------
 
-        plot_df = rese_df.loc[
-            start_hour - 1:end_hour - 1,
-            source_columns
-        ].copy()
+        hourly_data = {}
 
-        plot_df = plot_df.apply(
-            pd.to_numeric,
-            errors="coerce"
-        ).fillna(0)
+        for source in source_columns:
 
-        plot_df = plot_df / 1000
+            hourly_data[source] = np.asarray(
+                rese_results[source]["hourly_output_mw"],
+                dtype=float
+            )[start_hour - 1:end_hour]
+
+        plot_df = pd.DataFrame(hourly_data)
 
         # -----------------------------------------------------
         # Check source values
@@ -118,7 +142,6 @@ def rese_plots(
         for column in source_columns:
 
             if plot_df[column].sum() == 0:
-
                 print(
                     f"Warning: {column} contains no generation "
                     "in the selected period."
@@ -138,21 +161,17 @@ def rese_plots(
         # -----------------------------------------------------
 
         if plot_title is None:
-
             plot_title = (
                 "Hourly Renewable Electricity Generation"
             )
 
-        ylabel = (
-            "Renewable Electricity Generation (MW)"
-        )
+        ylabel = "Renewable Electricity Generation (MW)"
 
         # -----------------------------------------------------
         # Plot file
         # -----------------------------------------------------
 
         if plot_file is None:
-
             plot_file = (
                 "plots/rese_power_hourly.png"
             )
@@ -164,60 +183,6 @@ def rese_plots(
     else:
 
         # -----------------------------------------------------
-        # Check input
-        # -----------------------------------------------------
-
-        if not isinstance(rese_results, dict):
-            raise TypeError(
-                "rese_results must be a dictionary "
-                "when plot_type='cumulative'."
-            )
-
-        if not rese_results:
-            raise ValueError(
-                "rese_results is empty."
-            )
-
-        # -----------------------------------------------------
-        # Select renewable sources
-        # -----------------------------------------------------
-
-        if source_columns is None:
-
-            source_columns = list(
-                rese_results.keys()
-            )
-
-        else:
-
-            source_columns = list(
-                source_columns
-            )
-
-        if not source_columns:
-
-            raise ValueError(
-                "No renewable sources were found."
-            )
-
-        # -----------------------------------------------------
-        # Check source names
-        # -----------------------------------------------------
-
-        missing_sources = [
-            source
-            for source in source_columns
-            if source not in rese_results
-        ]
-
-        if missing_sources:
-
-            raise ValueError(
-                "Sources not found in rese_results: "
-                f"{missing_sources}"
-            )
-
-        # -----------------------------------------------------
         # Check cumulative data
         # -----------------------------------------------------
 
@@ -227,7 +192,6 @@ def rese_plots(
                 "cumulative_energy_gwh_hourly"
                 not in rese_results[source]
             ):
-
                 raise ValueError(
                     f"{source} does not contain "
                     "'cumulative_energy_gwh_hourly'."
@@ -251,23 +215,19 @@ def rese_plots(
         # -----------------------------------------------------
 
         if end_hour is None:
-
             end_hour = n_hours
 
         if start_hour < 1:
-
             raise ValueError(
                 "start_hour must be greater than or equal to 1."
             )
 
         if end_hour > n_hours:
-
             raise ValueError(
                 f"end_hour cannot exceed {n_hours}."
             )
 
         if start_hour > end_hour:
-
             raise ValueError(
                 "start_hour must be less than or equal to end_hour."
             )
@@ -280,22 +240,14 @@ def rese_plots(
 
         for source in source_columns:
 
-            cumulative_data[source] = (
+            cumulative_data[source] = np.asarray(
                 rese_results[source][
                     "cumulative_energy_gwh_hourly"
-                ][
-                    start_hour - 1:end_hour
-                ]
-            )
+                ],
+                dtype=float
+            )[start_hour - 1:end_hour]
 
-        plot_df = pd.DataFrame(
-            cumulative_data
-        )
-
-        plot_df = plot_df.apply(
-            pd.to_numeric,
-            errors="coerce"
-        ).fillna(0)
+        plot_df = pd.DataFrame(cumulative_data)
 
         # -----------------------------------------------------
         # Hours
@@ -311,7 +263,6 @@ def rese_plots(
         # -----------------------------------------------------
 
         if plot_title is None:
-
             plot_title = (
                 "Cumulative Renewable Energy Generation"
             )
@@ -325,7 +276,6 @@ def rese_plots(
         # -----------------------------------------------------
 
         if plot_file is None:
-
             plot_file = (
                 "plots/rese_power_cumulative.png"
             )
@@ -442,7 +392,6 @@ def rese_plots(
         )
 
         if plot_dir:
-
             os.makedirs(
                 plot_dir,
                 exist_ok=True
@@ -463,5 +412,4 @@ def rese_plots(
     # =========================================================
 
     if show_plot:
-
         plt.show()
