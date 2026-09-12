@@ -583,7 +583,7 @@ class HyTEACore:
         self.no_storage_demand_fulfilled = (
             self.no_storage_total_h2_deficit_kg <= 1e-9
         )
-
+        """
         if self.no_storage_demand_fulfilled:
             print("H₂ demand fulfilled.")
         else:
@@ -592,7 +592,7 @@ class HyTEACore:
                 f"Total annual deficit = "
                 f"{self.no_storage_total_h2_deficit_kg:,.2f} kg."
             )
-
+        """
         return {
             "no_storage_demand_fulfilled":
                 self.no_storage_demand_fulfilled,

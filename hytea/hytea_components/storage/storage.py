@@ -316,7 +316,7 @@ class HydrogenStorage:
                     f"A storage capacity of at least "
                     f"{self.required_capacity_kg:.2f} kg "
                     f"({self.required_capacity_kg / 1000:.2f} tonnes) "
-                    f"would be required to fully satisfy the demand."
+                    f"would be required to fully satisfy the demand/store the surplus."
                 )
 
             else:
