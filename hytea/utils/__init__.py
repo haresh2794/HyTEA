@@ -5,3 +5,5 @@ from .plots_resepw import rese_plots
 from .plots_storage import storage_plots
 from .plots_lcoh import lcoh_scenarios_plots
 from .create_scenarios_config import create_scenario_config
+from .plots_ghg import ghg_intensity_scenarios_plots
+from .save_scenarios_to_csv import save_scenario_results_to_csv
