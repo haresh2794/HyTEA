@@ -1,4 +1,4 @@
-# HyTEA
+# HyTEA Version 0.9.1
 
 ## Hydrogen Techno-Economic Assessment Tool
 
