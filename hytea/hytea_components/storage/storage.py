@@ -54,6 +54,8 @@ class HydrogenStorage:
         # ---------------- Summary ----------------
         self.required_initial_storage_kg = None  # kg (buffer)
         self.required_capacity_kg = None         # kg (sized)
+        self.storage_capacity_kg = None
+        self.storage_capacity_t = None
 
         # ---------------- Hourly Outputs (rates, tph) ----------------
         self.hourly_demand_tph = None
@@ -344,6 +346,8 @@ class HydrogenStorage:
 
         
         cap_t = capacity_kg / 1000.0
+        self.storage_capacity_kg = capacity_kg
+        self.storage_capacity_t = cap_t
 
         
         if capacity_kg <= 0:
@@ -729,6 +733,8 @@ class HydrogenStorage:
             "total_compressor_opex":self.total_compressor_opex,
             "total_storage_capex": self.total_storage_capex,
             "total_storage_opex": self.total_storage_opex,
+            "storage_capacity_kg": self.storage_capacity_kg,
+            "storage_capacity_t": self.storage_capacity_t,
 
             # Hourly inputs
             "hourly_demand_kgph": self.hourly_demand_kgph,

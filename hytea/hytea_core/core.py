@@ -545,10 +545,9 @@ class HyTEACore:
                 "WARNING: Starting storage is greater than zero "
                 f"({starting_h2_t:.3f} t), but the starting H2 cost "
                 "per kg is zero. Please specify a starting H2 cost "
-                "per kg, or size the electrolyser using OP2 to obtain "
-                "zero starting storage."
+                "per kg (starting_h2_cost_per_kg)"
             )
-            
+
     def build_h2_supply(self):
         """
         Build the common hourly hydrogen supply stream.
