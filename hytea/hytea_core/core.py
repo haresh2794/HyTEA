@@ -510,6 +510,45 @@ class HyTEACore:
 
         return self.storage_results
     
+    def check_starting_storage_cost(self):
+        """
+        Warn if the storage system starts with pre-existing H2
+        and no starting H2 cost has been specified.
+        """
+
+        if not self.storage_results:
+            return
+
+        starting_storage_t = np.asarray(
+            self.storage_results.get(
+                "starting_storage_t",
+                np.array([])
+            ),
+            dtype=float
+        )
+
+        if starting_storage_t.size == 0:
+            return
+
+        starting_h2_t = float(starting_storage_t[0])
+
+        starting_h2_cost_per_kg = float(
+            self.storage_results.get(
+                "starting_h2_cost_per_kg",
+                0.0
+            )
+        )
+
+        if starting_h2_t > 0 and starting_h2_cost_per_kg <= 0:
+
+            print(
+                "WARNING: Starting storage is greater than zero "
+                f"({starting_h2_t:.3f} t), but the starting H2 cost "
+                "per kg is zero. Please specify a starting H2 cost "
+                "per kg, or size the electrolyser using OP2 to obtain "
+                "zero starting storage."
+            )
+            
     def build_h2_supply(self):
         """
         Build the common hourly hydrogen supply stream.
@@ -1375,6 +1414,8 @@ class HyTEACore:
         # Run hydrogen storage only if enabled
         if self.config.get("use_storage", True):
             self.run_storage()
+            # Check whether pre-existing starting H2 has a cost
+            self.check_starting_storage_cost()
         else:
             self.storage_model = None
             self.storage_results = {}

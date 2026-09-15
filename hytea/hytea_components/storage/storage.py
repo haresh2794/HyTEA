@@ -69,6 +69,8 @@ class HydrogenStorage:
 
         # ---------------- Hourly Outputs (inventories, tonnes) ----------------
         self.starting_storage_t = None
+        self.starting_h2_cost_per_kg = 0.0
+        self.starting_h2_cost = 0.0
         self.actual_storage_t = None
         self.ideal_storage_t = None
         self.storage_no_init_t = None
@@ -214,6 +216,7 @@ class HydrogenStorage:
         #self.starting_storage_hours = float(cfg.get("starting_storage_hours", 0.0))
         # Optional: actual starting storage in tonnes
         self.starting_h2_storage_t = cfg.get("starting_h2_storage_t", None)
+        self.starting_h2_cost_per_kg = cfg.get("starting_h2_cost_per_kg", 0.0)
 
         if self.starting_h2_storage_t is not None:
             self.starting_h2_storage_t = float(self.starting_h2_storage_t)
@@ -443,6 +446,7 @@ class HydrogenStorage:
             )
 
         """
+        """
         # ---------- Starting storage t=0 ----------
         if self.starting_h2_storage_t is None:
             # Default: start with full storage capacity
@@ -450,15 +454,62 @@ class HydrogenStorage:
         else:
             # User-defined actual starting storage
             starting_storage_t[0] = self.starting_h2_storage_t
+        """
+        # ---------- Starting storage t=0 ----------
 
-                # Starting inventory cannot exceed physical storage capacity
+        if self.starting_h2_storage_t is not None:
+
+            # User-defined initial storage
+            starting_storage_t[0] = self.starting_h2_storage_t
+
+        else:
+
+            opt = str(self.storage_sizing_option).strip().lower()
+
+            if opt in ["full storage", "full", "auto"]:
+
+                # Default to required initial storage
+                starting_storage_t[0] = req_init_t
+
+                print(
+                    f"Warning: Starting storage was not specified. "
+                    f"Defaulting to the required initial storage of "
+                    f"{req_init_t:.3f} t for the 'Full storage' case."
+                )
+
+            elif opt in ["tonnes", "tonne", "t"]:
+
+                # Default to full selected storage capacity
+                starting_storage_t[0] = cap_t
+
+                print(
+                    f"Warning: Starting storage was not specified. "
+                    f"Defaulting to the selected storage capacity of "
+                    f"{cap_t:.3f} t for the 'Tonnes' case."
+                )
+
+            else:
+
+                raise ValueError(
+                    "Starting storage default is only defined for "
+                    "'Full storage' and 'Tonnes'."
+                )
+            
+
+        # Starting inventory cannot exceed physical storage capacity
         if starting_storage_t[0] > cap_t:
             raise ValueError(
                 f"Starting storage ({starting_storage_t[0]:.3f} t) "
                 f"exceeds storage capacity ({cap_t:.3f} t). "
                 "Increase storage capacity or reduce starting_h2_storage_t."
             )
-
+        # ---------- Starting H2 cost ----------
+        self.starting_h2_cost = (
+            starting_storage_t[0]
+            * 1000.0
+            * self.starting_h2_cost_per_kg
+        )
+        
         # ---------- Chain simulation ----------
         for t in range(n):
             s_start = starting_storage_t[t]
@@ -621,6 +672,7 @@ class HydrogenStorage:
 
         self.total_storage_opex = (
             self.total_storage_capex * 0.02
+            + self.starting_h2_cost
         )
 
         # ---------- Derived inventories for reporting ----------
@@ -700,6 +752,8 @@ class HydrogenStorage:
             "ideal_storage_t": self.ideal_storage_t,
             "storage_no_init_t": self.storage_no_init_t,
             "warning": warning_message,
+            "starting_h2_cost_per_kg": self.starting_h2_cost_per_kg,
+            "starting_h2_cost": self.starting_h2_cost,
 
             # kg series
             "h2_additions_kgph": self.h2_additions_kgph,
