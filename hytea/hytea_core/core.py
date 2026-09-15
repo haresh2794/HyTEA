@@ -1414,7 +1414,7 @@ class HyTEACore:
         if self.config.get("use_storage", True):
             self.run_storage()
             # Check whether pre-existing starting H2 has a cost
-            self.check_starting_storage_cost()
+            #self.check_starting_storage_cost()
         else:
             self.storage_model = None
             self.storage_results = {}

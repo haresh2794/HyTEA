@@ -40,6 +40,7 @@ class HydrogenStorage:
         self.total_storage_capex = None
         self.total_storage_opex = None
         self.outputs = None
+        self.curtailed_h2_tph = None
 
         # Starting storage policy
         self.starting_storage_option = "Full storage"  # "Full storage" or "Hours"
@@ -428,6 +429,7 @@ class HydrogenStorage:
         shortfall_tph = np.zeros(n)
         storage_to_demand_tph = np.zeros(n)
         supply_tph = np.zeros(n)
+        curtailed_h2_tph = np.zeros(n)
 
         boil_off_t = np.zeros(n)
         
@@ -462,6 +464,13 @@ class HydrogenStorage:
         # ---------- Starting storage t=0 ----------
 
         if self.starting_h2_storage_t is not None:
+            opt = str(self.storage_sizing_option).strip().lower()
+            if opt in ["full storage", "full", "auto"]:
+                print(
+                    "Warning: Full storage conditions are overridden by the "
+                    "starting storage specification. Remove the starting storage specification."
+                
+                )
 
             # User-defined initial storage
             starting_storage_t[0] = self.starting_h2_storage_t
@@ -475,11 +484,6 @@ class HydrogenStorage:
                 # Default to required initial storage
                 starting_storage_t[0] = req_init_t
 
-                print(
-                    f"Warning: Starting storage was not specified. "
-                    f"Defaulting to the required initial storage of "
-                    f"{req_init_t:.3f} t for the 'Full storage' case."
-                )
 
             elif opt in ["tonnes", "tonne", "t"]:
 
@@ -496,7 +500,7 @@ class HydrogenStorage:
 
                 raise ValueError(
                     "Starting storage default is only defined for "
-                    "'Full storage' and 'Tonnes'."
+                    "' Tonnes'."
                 )
             
 
@@ -536,6 +540,12 @@ class HydrogenStorage:
                 surplus_tph,
                 available_capacity_t
             )
+
+            # H2 that cannot be supplied to demand or stored
+            curtailed_h2_tph[t] = max(
+                0.0,
+                p - prod_to_demand_tph[t] - prod_to_storage_tph[t]
+)
 
             # Demand shortfall
             demand_remaining_tph[t] = max(0.0, d - prod_to_demand_tph[t])
@@ -654,13 +664,13 @@ class HydrogenStorage:
             self.total_storage_capex = (
                 self.storage_specific_capex * capacity_kg
                 - self.total_compressor_capex
-            )
+            ) + self.starting_h2_cost
 
         else:
 
             self.total_storage_capex = (
                 self.storage_specific_capex * capacity_kg
-            )
+            )+ self.starting_h2_cost
         #------------Compressor OPEX calculation--------------
 
         if self.storage_method == "Liquid H2":
@@ -676,7 +686,7 @@ class HydrogenStorage:
 
         self.total_storage_opex = (
             self.total_storage_capex * 0.02
-            + self.starting_h2_cost
+            
         )
 
         # ---------- Derived inventories for reporting ----------
@@ -700,6 +710,7 @@ class HydrogenStorage:
         self.demand_shortfall_tph = shortfall_tph
         self.storage_to_demand_tph = storage_to_demand_tph
         self.supply_tph = supply_tph
+        self.curtailed_h2_tph = curtailed_h2_tph
         self.storage_inflows_tph = prod_to_storage_tph
         self.storage_outflows_tph = -storage_to_demand_tph
 
@@ -722,6 +733,8 @@ class HydrogenStorage:
         self.cumulative_production_t = cumulative_production_t
         self.cumulative_demand_t = cumulative_demand_t
         self.cumulative_supply_t = cumulative_supply_t
+
+        
         # ---------- Collect all outputs into dictionary ----------
         self.outputs = {
             # Scalars
@@ -749,6 +762,7 @@ class HydrogenStorage:
             "demand_shortfall_tph": self.demand_shortfall_tph,
             "storage_to_demand_tph": self.storage_to_demand_tph,
             "supply_tph": self.supply_tph,
+            "curtailed_h2_tph": self.curtailed_h2_tph,
             "storage_inflows_tph": self.storage_inflows_tph,
             "storage_outflows_tph": self.storage_outflows_tph,
 
