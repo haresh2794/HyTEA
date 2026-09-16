@@ -464,7 +464,7 @@ help(function_name)
 
 ---
 
-# 7. Optimisation
+# 7. Optimisation/Sizing
 
 HyTEA includes optimisation tools under:
 
