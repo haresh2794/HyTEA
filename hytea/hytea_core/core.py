@@ -1297,6 +1297,8 @@ class HyTEACore:
         # -------------------------
         # 4. Hydrogen production
         # -------------------------
+
+        """
         total_h2_kg = self._get_annual_h2_for_lcoh()
 
         if total_h2_kg <= 0:
@@ -1304,7 +1306,32 @@ class HyTEACore:
 
         total_h2_t = total_h2_kg / 1000.0
 
+        """
+        environment_cfg = self.config.get("environment", {})
 
+        ghg_basis = environment_cfg.get(
+            "h2_ghg_basis",
+            "produced"
+        ).lower()
+
+        if ghg_basis == "produced":
+            total_h2_kg = self._get_annual_h2_for_lcoh()
+
+        elif ghg_basis == "delivered":
+            total_h2_kg = self._get_annual_h2_delivered_basis()
+
+        else:
+            raise ValueError(
+                "Invalid 'h2_ghg_basis'. "
+                "Choose either 'produced' or 'delivered'."
+            )
+
+        if total_h2_kg <= 0:
+            raise ValueError(
+                "Total H2 for GHG intensity calculation is zero."
+            )
+
+        total_h2_t = total_h2_kg / 1000.0
         # -------------------------
         # 5. Metrics
         # -------------------------

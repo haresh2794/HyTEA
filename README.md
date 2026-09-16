@@ -37,7 +37,9 @@ haresankar.jayasankar@universityofgalway.ie
 
 If you use HyTEA in a publication, report, presentation, or other academic work, please cite the software as follows:
 
-Monaghan, R., & Jayashankar, H. (2026). HyTEA – Hydrogen Techno-Economic Assessment Tool. University of Galway. HYDEA Project, European Union and Interreg Atlantic Area. https://www.eu-hydea.eu/
+Contact Prof. Monaghan 
+
+(2026). HyTEA – Hydrogen Techno-Economic Assessment Tool. University of Galway. HYDEA Project, European Union and Interreg Atlantic Area. https://www.eu-hydea.eu/
 
 ---
 

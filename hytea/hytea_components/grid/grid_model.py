@@ -3,6 +3,8 @@ import pandas as pd
 import yaml
 from importlib import resources  # allows access to files included in the package
 
+from documentation.grid_model_doc import GRID_DOC
+
 #All files developed and tested on COLAB and pasted
 
 class Grid:
@@ -185,3 +187,6 @@ class Grid:
             "avg_ghg_trend": self.avg_ghg_trend,
             "avg_price_trend" :self.avg_price_trend
         }
+    
+
+Grid.__doc__ = GRID_DOC
