@@ -41,6 +41,7 @@ class HyTEACore:
         self.no_storage_h2_surplus_kgph = np.array([])
         self.no_storage_total_h2_deficit_kg = 0.0
         self.no_storage_demand_fulfilled = True
+        self.supply_led_annual_demand_kg = 0.0
 
         self.transport_model = None
         self.transport_results = {}
@@ -583,9 +584,14 @@ class HyTEACore:
                 dtype=float
             )
 
-            self.check_h2_demand_when_no_storage()
+            # Hourly demand check is only applicable to demand-led
+            # operation without storage.
+            if self.config.get(
+                "operation_mode",
+                "demand_led"
+            ).lower() == "demand_led":
 
-        return self.h2_supply_kgph
+                self.check_h2_demand_when_no_storage()
     
 
     def check_h2_demand_when_no_storage(self):
@@ -1349,7 +1355,40 @@ class HyTEACore:
             "ghg_g_per_kWh": ghg_g_per_kWh
         }
     
+    #=========================================================
+    # build_supply_led_demand
+    #=======================================================
+    
+    def build_supply_led_demand(self):
+        """
+        Build annual H2 demand for a supply-led scenario.
 
+        In supply-led operation, annual H2 demand is equal
+        to annual H2 production from the electrolyser.
+
+        Storage operation is independent of this setting.
+        """
+
+        if not self.electrolyser_results:
+            raise ValueError(
+                "Electrolyser results are required before "
+                "building supply-led demand."
+            )
+
+        annual_production_kg = float(
+            self.electrolyser_results
+            .get("totals", {})
+            .get("H2_kg", 0.0)
+        )
+
+        if annual_production_kg <= 0:
+            raise ValueError(
+                "Annual H2 production must be greater than zero."
+            )
+
+        self.supply_led_annual_demand_kg = annual_production_kg
+
+        return self.supply_led_annual_demand_kg
     # =========================================================================================
     # CHECK for H2 Balance
     # =========================================================================================
@@ -1358,7 +1397,111 @@ class HyTEACore:
         """
         Check whether annual hydrogen supply is sufficient
         to meet annual demand.
+
+        Demand-led:
+            Annual demand comes from hourly_demand_kgph.
+
+        Supply-led:
+            Annual demand is equal to annual H2 production.
         """
+
+        # --------------------------------------------------
+        # H2 production from electrolyser
+        # --------------------------------------------------
+        annual_production_kg = 0.0
+
+        if self.electrolyser_results:
+            annual_production_kg = float(
+                self.electrolyser_results
+                .get("totals", {})
+                .get("H2_kg", 0.0)
+            )
+
+        # --------------------------------------------------
+        # H2 demand
+        # --------------------------------------------------
+        operation_mode = self.config.get(
+            "operation_mode",
+            "demand_led"
+        ).lower()
+
+        if operation_mode == "supply_led":
+
+            # Supply-led operation:
+            # annual demand = annual H2 production
+            annual_demand_kg = annual_production_kg
+
+        elif operation_mode == "demand_led":
+
+            # Demand-led operation:
+            # annual demand comes from user-provided demand profile
+            demand_kgph = np.asarray(
+                self.config["hourly_demand_kgph"],
+                dtype=float
+            )
+
+            annual_demand_kg = float(
+                np.sum(demand_kgph)
+            )
+
+        else:
+            raise ValueError(
+                "Invalid 'operation_mode'. "
+                "Choose either 'demand_led' or 'supply_led'."
+            )
+
+        # --------------------------------------------------
+        # H2 supply available to downstream system
+        # --------------------------------------------------
+        annual_supply_kg = float(
+            np.sum(self.h2_supply_kgph)
+        )
+
+        # --------------------------------------------------
+        # Supply vs demand
+        # --------------------------------------------------
+        surplus_deficit_kg = (
+            annual_supply_kg - annual_demand_kg
+        )
+
+        is_sufficient = (
+            annual_supply_kg >= annual_demand_kg
+        )
+
+        if is_sufficient:
+            message = (
+                f"Annual hydrogen supply is sufficient. "
+                f"Produced = {annual_production_kg:,.2f} kg/year, "
+                f"supply = {annual_supply_kg:,.2f} kg/year, "
+                f"demand = {annual_demand_kg:,.2f} kg/year, "
+                f"surplus = {surplus_deficit_kg:,.2f} kg/year."
+            )
+
+        else:
+            message = (
+                f"Annual hydrogen supply is not sufficient. "
+                f"Produced = {annual_production_kg:,.2f} kg/year, "
+                f"supply = {annual_supply_kg:,.2f} kg/year, "
+                f"demand = {annual_demand_kg:,.2f} kg/year, "
+                f"deficit = {abs(surplus_deficit_kg):,.2f} kg/year."
+            )
+
+        return {
+            "operation_mode": operation_mode,
+            "annual_production_kg": annual_production_kg,
+            "annual_supply_kg": annual_supply_kg,
+            "annual_demand_kg": annual_demand_kg,
+            "surplus_deficit_kg": surplus_deficit_kg,
+            "is_sufficient": is_sufficient,
+            "message": message,
+        }
+
+    """
+    def check_annual_h2_balance(self):
+    
+        #Check whether annual hydrogen supply is sufficient
+        #to meet annual demand.
+        
 
         # --------------------------------------------------
         # H2 demand
@@ -1428,7 +1571,7 @@ class HyTEACore:
             "is_sufficient": is_sufficient,
             "message": message,
         }
-    
+    """
     def evaluate(self):
         self.validate_config()
         self.run_rese_sources()
@@ -1446,7 +1589,16 @@ class HyTEACore:
             self.storage_model = None
             self.storage_results = {}
         # Build common H2 supply stream
+        # Build common H2 supply stream
         self.build_h2_supply()
+
+        # Build annual demand for supply-led operation
+        if self.config.get(
+            "operation_mode",
+            "demand_led"
+        ).lower() == "supply_led":
+
+            self.build_supply_led_demand()
         self.run_transport()
         self.run_economics()
         ghg_results = self.calculate_ghg_intensity()
@@ -1472,6 +1624,7 @@ class HyTEACore:
             "no_storage_total_h2_deficit_kg": self.no_storage_total_h2_deficit_kg,
             "no_storage_h2_deficit_kgph":self.no_storage_h2_deficit_kgph,
             "no_storage_h2_surplus_kgph":self.no_storage_h2_surplus_kgph,
+            "supply_led_annual_demand_kg":self.supply_led_annual_demand_kg,
             
         }
     
