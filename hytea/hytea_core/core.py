@@ -531,7 +531,50 @@ class HyTEACore:
         self.storage_model.configure(config=storage_config)
         self.storage_results = self.storage_model.hourly_analysis()
 
+        # Check whether storage is actually required to meet demand
+        production = np.asarray(
+            self.storage_results["hourly_production_kgph"],
+            dtype=float
+        )
+
+        demand = np.asarray(
+            self.storage_results["hourly_demand_kgph"],
+            dtype=float
+        )
+
+        storage_to_demand = np.asarray(
+            self.storage_results["storage_to_demand_tph"],
+            dtype=float
+        )
+
+        has_hourly_deficit = np.any(
+            production < demand - 1e-9
+        )
+
+        has_storage_discharge = np.any(
+            storage_to_demand > 1e-9
+        )
+
+        required_capacity_t = (
+            self.storage_results["required_capacity_kg"] / 1000.0
+        )
+
+        if (
+            not has_hourly_deficit
+            and not has_storage_discharge
+            and required_capacity_t > 1e-9
+        ):
+            print(
+                f"Warning: Hydrogen storage is not required to meet demand. "
+                f"The calculated storage capacity of "
+                f"{required_capacity_t:.3f} t is only required to store "
+                f"surplus hydrogen for the year. Consider setting 'use_storage' to False "
+                f"to exclude storage from the LCOH calculation."
+            )
+
         return self.storage_results
+
+       
     
     def check_starting_storage_cost(self):
         """
@@ -729,7 +772,7 @@ class HyTEACore:
             transport_config["Q1_kgph"] = float(
                 np.max(self.h2_supply_kgph)
             )
-
+        
         if "hourly_massflow_kgph" not in transport_config:
             transport_config["hourly_massflow_kgph"] = np.asarray(
                 self.h2_supply_kgph,

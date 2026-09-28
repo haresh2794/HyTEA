@@ -488,11 +488,11 @@ class HydrogenStorage:
             elif opt in ["tonnes", "tonne", "t"]:
 
                 # Default to full selected storage capacity
-                starting_storage_t[0] = cap_t
+                starting_storage_t[0] = 0
 
                 print(
-                    #f"Warning: Starting storage was not specified. "
-                    #f"Defaulting to the selected storage capacity of "
+                    f"Warning: Starting storage was not specified. "
+                    f"Defaulting to zero starting storage.  "
                    #f"{cap_t:.3f} t for the 'Tonnes' case."
                 )
 
