@@ -491,9 +491,9 @@ class HydrogenStorage:
                 starting_storage_t[0] = cap_t
 
                 print(
-                    f"Warning: Starting storage was not specified. "
-                    f"Defaulting to the selected storage capacity of "
-                    f"{cap_t:.3f} t for the 'Tonnes' case."
+                    #f"Warning: Starting storage was not specified. "
+                    #f"Defaulting to the selected storage capacity of "
+                   #f"{cap_t:.3f} t for the 'Tonnes' case."
                 )
 
             else:

@@ -269,7 +269,31 @@ class ALKElectrolyser:
     def h2_from_energy_kWh(self, energy_kWh,sec_electrolyser):
         total_sec = sec_electrolyser + self.sec_compression + self.sec_transport
         return energy_kWh / total_sec
+    def _size_scaling_factor(self, size_mw):
+        """
+        Interpolate the electrolyser scaling factor
+        between the available reference sizes.
+        """
 
+        sizes = np.array([
+            1,
+            5,
+            20,
+            100
+        ], dtype=float)
+
+        factors = np.array([
+            0.908995449,
+            0.999894994,
+            1.020301014,
+            1.041557285
+        ], dtype=float)
+
+        return np.interp(
+            size_mw,
+            sizes,
+            factors
+        )
 
 
     def _nearest_size(self, size_mw):
@@ -279,8 +303,10 @@ class ALKElectrolyser:
     def electrolyser_efficiency(self, load_pct, size_mw, install_year): #TEST 5.1 completed
         """Vectorised efficiency (fraction) for percentage load"""
         load = np.asarray(load_pct)
-        nearest_size = self._nearest_size(size_mw)
-        factor = self.scale_multiplier[nearest_size]
+
+        #nearest_size = self._nearest_size(size_mw)
+        #factor = self.scale_multiplier[nearest_size]
+        factor = self._size_scaling_factor(size_mw)
         improvement_term = self.annual_improvement ** (install_year - 2020)
 
         eff = np.zeros_like(load, dtype=float)
