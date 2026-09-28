@@ -820,6 +820,111 @@ class HyTEACore:
             raise ValueError(
                 f"Energy mismatch: streams sum = {total_from_streams}, system total = {total_system}"
             )
+        
+    def check_demand_led_electrolyser_sizing(self):
+        """
+        Check whether the electrolyser is appropriately sized for
+        the annual hydrogen demand in demand-led operation.
+
+        Warnings:
+        - Undersized: annual H2 production is below annual demand.
+        - Oversized: annual H2 production is above annual demand.
+
+        The check is based on annual electrolyser production and
+        does not depend on whether storage is enabled.
+        """
+
+        operation_mode = self.config.get(
+            "operation_mode",
+            "demand_led"
+        ).lower()
+
+        # Only applicable to demand-led operation
+        if operation_mode != "demand_led":
+            return None
+
+        # --------------------------------------------------
+        # Annual H2 production
+        # --------------------------------------------------
+        annual_production_kg = float(
+            self.electrolyser_results
+            .get("totals", {})
+            .get("H2_kg", 0.0)
+        )
+
+        # --------------------------------------------------
+        # Annual H2 demand
+        # --------------------------------------------------
+        demand_kgph = np.asarray(
+            self.config["hourly_demand_kgph"],
+            dtype=float
+        )
+
+        annual_demand_kg = float(
+            np.sum(demand_kgph)
+        )
+
+        # --------------------------------------------------
+        # Difference
+        # --------------------------------------------------
+        difference_kg = annual_production_kg - annual_demand_kg
+
+        # Small tolerance to avoid warnings from numerical
+        # differences when production and demand are effectively equal.
+        tolerance_kg = annual_demand_kg*0.05
+
+        # --------------------------------------------------
+        # Undersized
+        # --------------------------------------------------
+        if difference_kg < 0:
+
+            print(
+                 "WARNING: On an annual basis, the electrolyser is undersized. "
+                f"Annual H2 production = {annual_production_kg:,.2f} kg/year, "
+                f"while annual H2 demand = {annual_demand_kg:,.2f} kg/year. "
+                f"Annual H2 deficit = {abs(difference_kg):,.2f} kg/year."
+            )
+
+            return {
+                "sizing_status": "undersized",
+                "annual_production_kg": annual_production_kg,
+                "annual_demand_kg": annual_demand_kg,
+                "difference_kg": difference_kg,
+            }
+
+        # --------------------------------------------------
+        # Oversized
+        # --------------------------------------------------
+        elif difference_kg > tolerance_kg:
+
+            print(
+                "WARNING: On an annual basis, the electrolyser is oversized. "
+                f"Annual H2 production = {annual_production_kg:,.2f} kg/year, "
+                f"while annual H2 demand = {annual_demand_kg:,.2f} kg/year. "
+                f"Annual H2 surplus = {difference_kg:,.2f} kg/year. "
+                "Consider reducing the electrolyser size or use "
+                "the OP2 sizing utility to determine the appropriate "
+                "electrolyser capacity."
+            )
+
+            return {
+                "sizing_status": "oversized",
+                "annual_production_kg": annual_production_kg,
+                "annual_demand_kg": annual_demand_kg,
+                "difference_kg": difference_kg,
+            }
+
+        # --------------------------------------------------
+        # Correctly sized
+        # --------------------------------------------------
+        else:
+
+            return {
+                "sizing_status": "appropriately_sized",
+                "annual_production_kg": annual_production_kg,
+                "annual_demand_kg": annual_demand_kg,
+                "difference_kg": difference_kg,
+            }
     
     #==============================================================================================================================================================
     # ECONOMICS  
@@ -1650,6 +1755,12 @@ class HyTEACore:
         self.run_grid()
         self.setup_electrolyser()
         self.run_electrolyser()
+
+        # Check electrolyser sizing for demand-led operation
+        electrolyser_sizing_results = (
+            self.check_demand_led_electrolyser_sizing()
+        )
+
         self.validate_energy_balance()
         # Run hydrogen storage only if enabled
         if self.config.get("use_storage", True):
@@ -1685,6 +1796,7 @@ class HyTEACore:
             "power_df": self.power_df,
             "grid_stream_kW": self.grid_stream_kW,
             "electrolyser_results": self.electrolyser_results,
+            "electrolyser_sizing_results": electrolyser_sizing_results,
             "storage_results": self.storage_results,
             "transport_results": self.transport_results,
             "economics_results": self.economics_results,
