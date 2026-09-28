@@ -730,6 +730,12 @@ class HyTEACore:
                 np.max(self.h2_supply_kgph)
             )
 
+        if "hourly_massflow_kgph" not in transport_config:
+            transport_config["hourly_massflow_kgph"] = np.asarray(
+                self.h2_supply_kgph,
+                dtype=float
+            )
+
         return transport_config
     
     #======================================

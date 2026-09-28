@@ -25,6 +25,7 @@ class HydrogenTruckTransport:
         self.booster_spec_elec_consumption = None
         self.trailer_fill_time_h = None
         self.trailer_load_kg = None
+        self.hourly_massflow_kgph = None
 
         #--------overall secondary outputs---------
         self.capex_per_truck = None
@@ -461,10 +462,31 @@ class HydrogenTruckTransport:
             # No booster for liquid
             self.boost_spec_capex = 0
             self.sec_boost_kWh_per_kg = 0
+    
+        hourly_massflow = cfg.get("hourly_massflow_kgph", None)
+
+        if hourly_massflow is not None:
+            self.hourly_massflow_kgph = np.asarray(
+                hourly_massflow,
+                dtype=float
+            )
+
+            if len(self.hourly_massflow_kgph) != 8760:
+                raise ValueError(
+                    "hourly_massflow_kgph must contain 8760 hourly values."
+                )
+
+            if np.any(self.hourly_massflow_kgph < 0):
+                raise ValueError(
+                    "hourly_massflow_kgph cannot contain negative values."
+                )
 
       
     # Calculate minimum fleet after all inputs are configured
-        self._calc_min_trailers()
+        self._calc_min_trailers(
+                hourly_massflow_kgph=self.hourly_massflow_kgph
+            )
+        #self._calc_min_trailers()
     
     
 
