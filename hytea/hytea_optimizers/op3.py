@@ -597,7 +597,7 @@ def op3_supply_led_production_ele_sizing(
             )
 
         # ======================================================
-        # Combined legend
+        # Combined legend — bottom, 3 columns
         # ======================================================
 
         lines = line1 + line2 + line3
@@ -611,7 +611,10 @@ def op3_supply_led_production_ele_sizing(
             lines,
             labels,
             fontsize=legend_fontsize,
-            loc="best"
+            loc="upper center",
+            bbox_to_anchor=(0.5, -0.12),
+            ncol=3,
+            frameon=False
         )
 
         # ======================================================
@@ -644,6 +647,7 @@ def op3_supply_led_production_ele_sizing(
         # ======================================================
 
         fig.tight_layout()
+        fig.subplots_adjust(bottom=0.18)
 
         # ------------------------------------------------------
         # Save

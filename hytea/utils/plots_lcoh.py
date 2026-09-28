@@ -241,7 +241,7 @@ def lcoh_scenarios_plots(
         # ------------------------------------------------------
 
         ax.set_title(
-            "LCOH CAPEX and OPEX Breakdown",
+            "LCOH Breakdown",
             fontsize=title_fontsize
         )
 
@@ -325,7 +325,7 @@ def lcoh_scenarios_plots(
         # ------------------------------------------------------
 
         ax.set_title(
-            "LCOH Component Breakdown",
+            "LCOH Breakdown",
             fontsize=title_fontsize
         )
 
