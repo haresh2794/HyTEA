@@ -11,7 +11,11 @@ def load_demand_profile(
     demand_column="demand",
     plot_demand=False,
     save_plot=False,
-    plot_file="plots/demand_profile.png"
+    plot_file="plots/demand_profile.png",
+    xlabel_fontsize=15,
+    ylabel_fontsize=15,
+    title_fontsize=17,
+    tick_fontsize=12
 ):
     load_demand_profile.__doc__ = DEMAND_PROFILE_DOC
 
@@ -82,9 +86,24 @@ def load_demand_profile(
             linewidth=0.8
         )
 
-        plt.xlabel("Hour of Year")
-        plt.ylabel("Hydrogen Demand (kg/h)")
-        plt.title("Hourly Hydrogen Demand Profile")
+        plt.xlabel(
+            "Hour of Year",
+            fontsize=xlabel_fontsize
+        )
+
+        plt.ylabel(
+            "Hydrogen Demand (kg/h)",
+            fontsize=ylabel_fontsize
+        )
+
+        plt.title(
+            "Hourly Hydrogen Demand Profile",
+            fontsize=title_fontsize
+        )
+
+        plt.xticks(fontsize=tick_fontsize)
+        plt.yticks(fontsize=tick_fontsize)
+
         plt.grid(True, alpha=0.3)
         plt.tight_layout()
 

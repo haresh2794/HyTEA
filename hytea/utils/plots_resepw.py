@@ -5,7 +5,6 @@ import matplotlib.pyplot as plt
 
 from .documentation.plot_resepw_doc import RESE_PLOTS_DOC
 
-
 def rese_plots(
     rese_results,
     source_columns=None,
@@ -15,9 +14,12 @@ def rese_plots(
     plot_title=None,
     save_plot=False,
     plot_file=None,
-    show_plot=True
+    show_plot=True,
+    xlabel_fontsize=14,
+    ylabel_fontsize=14,
+    title_fontsize=16,
+    tick_fontsize=12,
 ):
-    
     rese_plots.__doc__ = RESE_PLOTS_DOC
     # =========================================================
     # Validate plot type
@@ -341,20 +343,23 @@ def rese_plots(
     # =========================================================
 
     ax.set_xlabel(
-        "Hour of Year"
+        "Hour of Year",
+        fontsize=xlabel_fontsize
     )
 
     ax.set_ylabel(
-        ylabel
+        ylabel,
+        fontsize=ylabel_fontsize
     )
 
     ax.set_title(
-        plot_title
+        plot_title,
+        fontsize=title_fontsize
     )
 
-    ax.set_xlim(
-        start_hour,
-        end_hour
+    ax.tick_params(
+        axis="both",
+        labelsize=tick_fontsize
     )
 
     # =========================================================

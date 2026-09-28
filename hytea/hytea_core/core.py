@@ -56,6 +56,7 @@ class HyTEACore:
 
     def configure(self, config): #Configuring the inputs for submodels
         self.config = dict(config)
+        self.show_warnings = self.config.get("show_warnings", True)
 
     
     #=============================
@@ -564,12 +565,13 @@ class HyTEACore:
             and not has_storage_discharge
             and required_capacity_t > 1e-9
         ):
-            print(
-                f"Warning: Hydrogen storage is not required to meet demand. "
-                f"The calculated storage capacity of "
-                f"{required_capacity_t:.3f} t is only required to store "
-                f"surplus hydrogen for the year. Consider setting 'use_storage' to False "
-                f"to exclude storage from the LCOH calculation."
+            if self.show_warnings:
+                print(
+                    f"Warning: Hydrogen storage is not required to meet demand. "
+                    f"The calculated storage capacity of "
+                    f"{required_capacity_t:.3f} t is only required to store "
+                    f"surplus hydrogen for the year. Consider setting 'use_storage' to False "
+                    f"to exclude storage from the LCOH calculation."
             )
 
         return self.storage_results
@@ -606,12 +608,12 @@ class HyTEACore:
         )
 
         if starting_h2_t > 0 and starting_h2_cost_per_kg <= 0:
-
-            print(
-                "WARNING: Starting storage is greater than zero "
-                f"({starting_h2_t:.3f} t), but the starting H2 cost "
-                "per kg is zero. Please specify a starting H2 cost "
-                "per kg (starting_h2_cost_per_kg)"
+            if self.show_warnings:    
+                print(
+                    "WARNING: Starting storage is greater than zero "
+                    f"({starting_h2_t:.3f} t), but the starting H2 cost "
+                    "per kg is zero. Please specify a starting H2 cost "
+                    "per kg (starting_h2_cost_per_kg)"
             )
 
     def build_h2_supply(self):
@@ -877,12 +879,14 @@ class HyTEACore:
         # Undersized
         # --------------------------------------------------
         if difference_kg < 0:
-
-            print(
-                 "WARNING: On an annual basis, the electrolyser is undersized. "
-                f"Annual H2 production = {annual_production_kg:,.2f} kg/year, "
-                f"while annual H2 demand = {annual_demand_kg:,.2f} kg/year. "
-                f"Annual H2 deficit = {abs(difference_kg):,.2f} kg/year."
+            if self.show_warnings:
+                print(
+                    "WARNING: The electrolyser is undersized "
+                    "(based on annual H2 production and demand). "
+                    f"Annual H2 production = {annual_production_kg:,.2f} kg/year, "
+                    f"while annual H2 demand = {annual_demand_kg:,.2f} kg/year. "
+                    f"Annual H2 deficit = {abs(difference_kg):,.2f} kg/year."
+                    "If this deficit is intentional, the warning can be ignored. "
             )
 
             return {
@@ -896,15 +900,17 @@ class HyTEACore:
         # Oversized
         # --------------------------------------------------
         elif difference_kg > tolerance_kg:
-
-            print(
-                "WARNING: On an annual basis, the electrolyser is oversized. "
-                f"Annual H2 production = {annual_production_kg:,.2f} kg/year, "
-                f"while annual H2 demand = {annual_demand_kg:,.2f} kg/year. "
-                f"Annual H2 surplus = {difference_kg:,.2f} kg/year. "
-                "Consider reducing the electrolyser size or use "
-                "the OP2 sizing utility to determine the appropriate "
-                "electrolyser capacity."
+            if self.show_warnings:
+                print(
+                    "WARNING: The electrolyser is oversized "
+                    "(based on annual H2 production and demand). "
+                    f"Annual H2 production = {annual_production_kg:,.2f} kg/year, "
+                    f"while annual H2 demand = {annual_demand_kg:,.2f} kg/year. "
+                    f"Annual H2 surplus = {difference_kg:,.2f} kg/year. "
+                    "Consider reducing the electrolyser size or use "
+                    "the OP2 sizing utility to determine the appropriate "
+                    "electrolyser capacity." 
+                    "If this surplus is intentional, the warning can be ignored. "
             )
 
             return {
