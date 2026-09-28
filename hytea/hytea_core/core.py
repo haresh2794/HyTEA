@@ -453,16 +453,38 @@ class HyTEACore:
         """
         storage_config = dict(self.config.get("storage", {}))
 
-        # Inject system-level H2 demand into storage model
-        if "hourly_demand_kgph" not in self.config:
-            raise ValueError(
-                "config must contain 'hourly_demand_kgph'."
+        # --------------------------------------------------
+        # H2 demand
+        # --------------------------------------------------
+        operation_mode = self.config.get(
+            "operation_mode",
+            "demand_led"
+        ).lower()
+
+        if operation_mode == "supply_led":
+
+            # Supply-led operation:
+            # hourly H2 demand follows hourly electrolyser production
+            storage_config["hourly_demand_kgph"] = np.asarray(
+                self.electrolyser_results["hourly"]["H2_kg"],
+                dtype=float
             )
 
-        storage_config["hourly_demand_kgph"] = np.asarray(
-            self.config["hourly_demand_kgph"],
-            dtype=float
-        )
+        else:
+
+            # Demand-led operation:
+            # hourly H2 demand is provided by the user
+            if "hourly_demand_kgph" not in self.config:
+                raise ValueError(
+                    "config must contain 'hourly_demand_kgph' "
+                    "for demand-led operation."
+                )
+
+            storage_config["hourly_demand_kgph"] = np.asarray(
+                self.config["hourly_demand_kgph"],
+                dtype=float
+            )
+
 
         # Inject H2 production from electrolyser
         if "hourly_production_kgph" not in storage_config:
