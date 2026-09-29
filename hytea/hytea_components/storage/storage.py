@@ -491,8 +491,8 @@ class HydrogenStorage:
                 starting_storage_t[0] = 0
 
                 print(
-                    f"Warning: Starting storage was not specified. "
-                    f"Defaulting to zero starting storage.  "
+                   # f"Warning: Starting storage was not specified. "
+                   # f"Defaulting to zero starting storage.  "
                    #f"{cap_t:.3f} t for the 'Tonnes' case."
                 )
 

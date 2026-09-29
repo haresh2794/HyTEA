@@ -15,21 +15,32 @@ def op2_electrolyser_capacity_storage(
     """
     OP2 – Electrolyser Capacity vs Hydrogen Storage Requirement
 
-    Determines the starting hydrogen storage and required hydrogen
-    storage capacity for a range of electrolyser capacities under
-    the 'Full storage' condition.
+    Determines the electrolyser capacity that requires the minimum
+    hydrogen storage capacity, subject to the condition that annual
+    hydrogen production is greater than annual hydrogen demand.
 
     The electrolyser capacity is varied while all other configuration
     parameters remain unchanged.
+
+    Only electrolyser capacities where:
+
+        Annual H2 production > Annual H2 demand
+
+    are considered feasible.
+
+    Among the feasible electrolyser capacities, the capacity with
+    the minimum required hydrogen storage capacity is selected.
 
     Returns:
         dict containing:
             - results: DataFrame
             - minimum_required_storage_t: Minimum required storage
-              capacity across the tested electrolyser capacities
+              capacity among feasible electrolyser capacities
             - minimum_electrolyser_capacity_for_storage_mw:
               Electrolyser capacity corresponding to the minimum
               required storage capacity
+            - minimum_starting_storage_t: Starting storage at the
+              selected electrolyser capacity
             - figure: Matplotlib figure
     """
 
@@ -52,6 +63,11 @@ def op2_electrolyser_capacity_storage(
             f"OP2 requires 8760 hourly demand values. "
             f"Found {len(demand_kgph)}."
         )
+
+    # Annual H2 demand
+    annual_h2_demand_t = float(
+        np.sum(demand_kgph) / 1000.0
+    )
 
     # ---------------------------------------------------------
     # Check capacity inputs
@@ -125,6 +141,25 @@ def op2_electrolyser_capacity_storage(
             )
 
         # -----------------------------------------------------
+        # Annual H2 production
+        # -----------------------------------------------------
+
+        annual_h2_production_t = (
+            float(
+                model.electrolyser_results["totals"]["H2_kg"]
+            )
+            / 1000.0
+        )
+
+        # -----------------------------------------------------
+        # Check electrolyser sizing
+        # -----------------------------------------------------
+
+        production_greater_than_demand = (
+            annual_h2_production_t > annual_h2_demand_t
+        )
+
+        # -----------------------------------------------------
         # Starting storage
         # -----------------------------------------------------
 
@@ -162,7 +197,18 @@ def op2_electrolyser_capacity_storage(
             "Electrolyser capacity (MW)": float(
                 electrolyser_capacity
             ),
-            "Starting storage (t)": starting_storage_t,
+            "Annual H2 production (t/year)": (
+                annual_h2_production_t
+            ),
+            "Annual H2 demand (t/year)": (
+                annual_h2_demand_t
+            ),
+            "Production > Demand": (
+                production_greater_than_demand
+            ),
+            "Starting storage (t)": (
+                starting_storage_t
+            ),
             "Required initial storage (t)": (
                 required_initial_storage_t
             ),
@@ -178,31 +224,56 @@ def op2_electrolyser_capacity_storage(
     results_df = pd.DataFrame(results)
 
     # ---------------------------------------------------------
-    # Find minimum required storage capacity
+    # Select only capacities where:
+    #
+    # Annual H2 production > Annual H2 demand
     # ---------------------------------------------------------
 
-    minimum_storage_index = results_df[
+    feasible_results_df = results_df[
+        results_df["Annual H2 production (t/year)"]
+        > results_df["Annual H2 demand (t/year)"]
+    ].copy()
+
+    if feasible_results_df.empty:
+        raise ValueError(
+            "No electrolyser capacity in the specified range "
+            "produces more H2 than the annual demand."
+        )
+
+    # ---------------------------------------------------------
+    # Find minimum required storage capacity
+    # among feasible electrolyser capacities
+    # ---------------------------------------------------------
+
+    minimum_storage_index = feasible_results_df[
         "Required storage capacity (t)"
     ].idxmin()
 
     minimum_required_storage_t = float(
-        results_df.loc[
+        feasible_results_df.loc[
             minimum_storage_index,
             "Required storage capacity (t)"
         ]
     )
 
     minimum_electrolyser_capacity_for_storage_mw = float(
-        results_df.loc[
+        feasible_results_df.loc[
             minimum_storage_index,
             "Electrolyser capacity (MW)"
         ]
     )
 
     minimum_starting_storage_t = float(
-        results_df.loc[
+        feasible_results_df.loc[
             minimum_storage_index,
             "Starting storage (t)"
+        ]
+    )
+
+    minimum_h2_production_t = float(
+        feasible_results_df.loc[
+            minimum_storage_index,
+            "Annual H2 production (t/year)"
         ]
     )
 
@@ -252,8 +323,21 @@ def op2_electrolyser_capacity_storage(
     # Print results
     # ---------------------------------------------------------
 
+    print("\nOP2 result:")
+
     print(
-        "\nOP2 result:"
+        f"Annual H2 demand: "
+        f"{annual_h2_demand_t:.2f} t/year"
+    )
+
+    print(
+        f"Annual H2 production at selected capacity: "
+        f"{minimum_h2_production_t:.2f} t/year"
+    )
+
+    print(
+        f"Selected electrolyser capacity: "
+        f"{minimum_electrolyser_capacity_for_storage_mw:.2f} MW"
     )
 
     print(
@@ -262,12 +346,7 @@ def op2_electrolyser_capacity_storage(
     )
 
     print(
-        f"Electrolyser capacity at minimum required storage: "
-        f"{minimum_electrolyser_capacity_for_storage_mw:.2f} MW"
-    )
-
-    print(
-        f"Starting storage at minimum required storage: "
+        f"Starting storage at selected capacity: "
         f"{minimum_starting_storage_t:.3f} t"
     )
 
